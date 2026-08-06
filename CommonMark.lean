@@ -17,4 +17,4 @@ Main entry points: `CommonMark.parseDocument : String → Document` and
 `parseDocument` is total and matches the official example suite exactly (see
 `commonmark_conformance` in `test/Conformance.lean`); `renderHtml` is proved not to let
 any AST leaf's string content produce unescaped HTML markup or break out of an
-attribute (see the `*_safe` theorems in `CommonMark.Render.Html`). -/
+attribute (see the `*_safe` theorems in `test/EscapingSafety.lean`). -/
