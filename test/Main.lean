@@ -35,7 +35,8 @@ def checkExample (ex : SpecExample) : IO Bool := do
 -- driving that to 100% (and asserting it) is Phase 5's job, once every construct is in place.
 def regressionExamples : List Nat :=
   [43, 62, 83, 107, 119, 228, 231, 269, 650,
-   12, 25, 328, 350, 361, 400, 482, 572, 594, 613, 633, 648]
+   12, 25, 328, 350, 361, 400, 482, 572, 594, 613, 633, 648,
+   61, 21, 176, 592, 284]
 
 def main : IO Unit := do
   let examples ← loadSpecExamples "test/vendor/spec.json"

@@ -227,18 +227,24 @@ def parseTagName (chars : List Char) : Option (String × List Char) :=
       let name := chars.takeWhile (fun c => c.isAlphanum || c == '-')
       some (String.ofList name, chars.drop name.length)
 
+-- The type 6 condition only needs to recognize the tag name and what immediately follows
+-- it; type 7 (any other tag name) instead requires the whole line to be a single complete
+-- tag, so it's validated with the same tag grammar used for inline HTML.
 def matchHtmlType67Close (cs : List Char) (canInterrupt : Bool) : Option HtmlEndKind :=
   match parseTagName cs with
   | some (name, after) =>
     let lname := toLowerStr name
-    let followedOk :=
-      after.isEmpty || after.head? == some ' ' || after.head? == some '\t' ||
-      after.head? == some '>'
     if html6Tags.contains lname then
+      let followedOk :=
+        after.isEmpty || after.head? == some ' ' || after.head? == some '\t' ||
+        after.head? == some '>'
       if followedOk then some .untilBlank else none
-    else if followedOk then
-      if canInterrupt then none else some .untilBlank
-    else none
+    else
+      match matchCloseTag cs with
+      | some rest => if isBlank (String.ofList rest) then
+          (if canInterrupt then none else some .untilBlank)
+        else none
+      | none => none
   | none => none
 
 def matchHtmlType67Open (cs : List Char) (canInterrupt : Bool) : Option HtmlEndKind :=
@@ -251,8 +257,11 @@ def matchHtmlType67Open (cs : List Char) (canInterrupt : Bool) : Option HtmlEndK
         || (after.head? == some '/' && (after.drop 1).head? == some '>')
       if ok then some .untilBlank else none
     else
-      let ok := after.isEmpty || after == ['>'] || after == ['/', '>']
-      if ok then (if canInterrupt then none else some .untilBlank) else none
+      match matchOpenTag cs with
+      | some rest => if isBlank (String.ofList rest) then
+          (if canInterrupt then none else some .untilBlank)
+        else none
+      | none => none
   | none => none
 
 def matchHtmlBlockStart (line : String) (canInterruptParagraph : Bool) : Option HtmlEndKind :=

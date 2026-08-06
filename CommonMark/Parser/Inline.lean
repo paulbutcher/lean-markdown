@@ -599,6 +599,7 @@ def parseInlinesF (defs : LinkDefs) (insideLink : Bool) :
         .image dest title content :: parseInlinesF defs insideLink fuel (some closeChar) restAfter
       | none => .text "![" :: parseInlinesF defs insideLink fuel (some '[') rest
     | none => .text "![" :: parseInlinesF defs insideLink fuel (some '[') rest
+  | fuel + 1, _, '!' :: rest => .text "!" :: parseInlinesF defs insideLink fuel (some '!') rest
   | fuel + 1, _, '[' :: rest =>
     if insideLink then
       .text "[" :: parseInlinesF defs insideLink fuel (some '[') rest

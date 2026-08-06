@@ -91,7 +91,7 @@ private def renderBlockF (tight : Bool) : Nat → Block → String
       | none => ""
     "<pre><code" ++ classAttr ++ ">" ++ escapeText literal ++ "</code></pre>\n"
   | _ + 1, .thematicBreak => "<hr />\n"
-  | _ + 1, .htmlBlock s => s
+  | _ + 1, .htmlBlock s => if s.endsWith "\n" then s else s ++ "\n"
   | fuel + 1, .blockQuote content =>
     "<blockquote>\n" ++ renderBlocksF false fuel content ++ "</blockquote>\n"
   | fuel + 1, .list kind isTight items =>
@@ -99,9 +99,15 @@ private def renderBlockF (tight : Bool) : Nat → Block → String
       | .bullet _ => ("<ul>", "</ul>")
       | .ordered start _ =>
         if start == 1 then ("<ol>", "</ol>") else (s!"<ol start=\"{start}\">", "</ol>")
-    let itemOpen := if isTight then "<li>" else "<li>\n"
+    -- Tightness only suppresses the paragraph wrapper (and its surrounding newlines); an
+    -- item whose first block is anything else is rendered exactly as in a loose list.
+    let itemOpen (content : List Block) : String :=
+      match content with
+      | [] => "<li>"
+      | .paragraph _ :: _ => if isTight then "<li>" else "<li>\n"
+      | _ => "<li>\n"
     let itemsHtml := items.foldl
-      (fun acc content => acc ++ itemOpen ++ renderBlocksF isTight fuel content ++ "</li>\n") ""
+      (fun acc content => acc ++ itemOpen content ++ renderBlocksF isTight fuel content ++ "</li>\n") ""
     openTag ++ "\n" ++ itemsHtml ++ closeTag ++ "\n"
 
 private def renderBlocksF (tight : Bool) : Nat → List Block → String
