@@ -651,6 +651,15 @@ def flattenNode : INode → CommonMark.Inline
 def flattenNodes (arr : Array INode) : List CommonMark.Inline :=
   (arr.map flattenNode).toList
 
+-- The spec appendix's `openers_bottom`: once a closer of a given (character, closer-run-length
+-- mod 3, can-also-open) bucket has scanned back to some point and found no usable opener, no
+-- later closer in the *same* bucket needs to rescan that far, since `multipleOf3Ok`'s outcome
+-- for any given opener depends only on that bucket key, not on the closer's exact length.
+-- Without this, a run of many closers with no matching openers (e.g. many `foo*` in a row)
+-- costs O(n) per closer, O(n²) overall; this is the spec's own fix for that, not a bespoke one.
+def emphBucket (c : Char) (closeLen : Nat) (closerCanOpen : Bool) : Nat :=
+  (if c == '_' then 0 else 1) * 6 + (closeLen % 3) * 2 + (if closerCanOpen then 1 else 0)
+
 -- The spec appendix's "process emphasis" step: scan left to right for a closer, scan back
 -- from it for the nearest matching opener, and wrap the span between them. A leftover
 -- (partially used) opener or closer is kept in place with the reduced count so it remains
@@ -659,6 +668,8 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
   Id.run do
     let mut arr := arr0
     let mut i := 0
+    -- No usable opener remains at or below index `bottoms[bucket]` for that bucket.
+    let mut bottoms : Array Nat := Array.replicate 12 0
     -- Each step either consumes at least one unit from some delimiter run's count (bounded
     -- by the total character count) or moves past a node for good (bounded by array size).
     let fuel := 2 * arr0.size + (arr0.foldl (init := 0) fun acc n =>
@@ -670,17 +681,22 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
         if !canClose || n == 0 then
           i := i + 1
         else
+          let bucket := emphBucket c n closerCanOpen
+          let bottom := bottoms[bucket]!
           let mut foundJ : Option Nat := none
-          for k in [0 : i] do
-            if foundJ.isNone then
-              let j := i - 1 - k
-              match arr[j]! with
-              | .delim cj nj coj ccj =>
-                if cj == c && coj && nj > 0 && multipleOf3Ok nj n ccj closerCanOpen then
-                  foundJ := some j
-              | _ => pure ()
+          for k in [0 : i - bottom] do
+            let j := i - 1 - k
+            match arr[j]! with
+            | .delim cj nj coj ccj =>
+              if cj == c && coj && nj > 0 && multipleOf3Ok nj n ccj closerCanOpen then
+                foundJ := some j
+                break
+            | _ => pure ()
           match foundJ with
           | none =>
+            -- No opener for this bucket down to the old bottom, so nothing has changed; no
+            -- future closer in this bucket needs to search this far again.
+            bottoms := bottoms.set! bucket i
             if !closerCanOpen then
               arr := arr.set! i (.text (String.ofList (List.replicate n c)))
             i := i + 1
@@ -700,6 +716,9 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
               else
                 arr := arr.extract 0 j ++ openerLeftover ++
                   #[newNode, .delim ci closerLeftoverN coi cci] ++ arr.extract (i + 1) arr.size
+              -- Everything from `j` on was just renumbered (or removed); any bucket's bottom
+              -- that pointed past `j` no longer means anything, so pull it back to `j`.
+              bottoms := bottoms.map (min · j)
               i := j + openerLeftover.size + 1
             | _, _ => i := i + 1
       | _ => i := i + 1
@@ -713,17 +732,22 @@ def resolveBrackets (defs : LinkDefs) (arr0 : Array INode) : Array INode :=
   Id.run do
     let mut arr := arr0
     let mut i := 0
+    -- No `.openBracket` remains at or below this index: once a search has scanned this far
+    -- and found none, none can appear there later (openBrackets only ever turn into text,
+    -- never the reverse), so no later search needs to rescan that range. Without this, a
+    -- run of many `]` with nothing to match (e.g. many `[foo` never closed as links) costs
+    -- O(n) per `]`, O(n²) overall.
+    let mut bottom := 0
     let fuel := arr0.size + 4
     for _ in [0 : fuel] do
       if i ≥ arr.size then break
       let findOpener : Id (Option Nat) := do
         let mut foundJ : Option Nat := none
-        for k in [0 : i] do
-          if foundJ.isNone then
-            let j := i - 1 - k
-            match arr[j]! with
-            | .openBracket _ _ => foundJ := some j
-            | _ => pure ()
+        for k in [0 : i - bottom] do
+          let j := i - 1 - k
+          match arr[j]! with
+          | .openBracket _ _ => foundJ := some j; break
+          | _ => pure ()
         return foundJ
       match arr[i]! with
       | .closeBracketFail =>
@@ -732,11 +756,16 @@ def resolveBrackets (defs : LinkDefs) (arr0 : Array INode) : Array INode :=
           let openText := match arr[j]! with | .openBracket isImg _ => (if isImg then "![" else "[") | _ => ""
           arr := arr.set! j (.text openText)
           arr := arr.set! i (.text "]")
-        | none => arr := arr.set! i (.text "]")
+        | none =>
+          arr := arr.set! i (.text "]")
+          bottom := i
         i := i + 1
       | .closeBracket isImage dest title rawTailText =>
         match ← findOpener with
-        | none => arr := arr.set! i (.text ("]" ++ rawTailText)); i := i + 1
+        | none =>
+          arr := arr.set! i (.text ("]" ++ rawTailText))
+          bottom := i
+          i := i + 1
         | some j =>
           let isActive := match arr[j]! with | .openBracket _ act => act | _ => false
           if !isActive then
@@ -761,6 +790,9 @@ def resolveBrackets (defs : LinkDefs) (arr0 : Array INode) : Array INode :=
                 | .openBracket false true => arr := arr.set! k2 (.openBracket false false)
                 | _ => pure ()
             arr := arr.extract 0 j ++ #[newNode] ++ arr.extract (i + 1) arr.size
+            -- Same renumbering hazard as in `resolveEmphasis`: `j` and everything after it
+            -- just shifted, so a bottom that pointed past `j` is stale.
+            bottom := min bottom j
             i := j + 1
       | _ => i := i + 1
     return arr

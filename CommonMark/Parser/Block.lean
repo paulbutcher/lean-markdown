@@ -672,14 +672,17 @@ def finalizeState (st : State) : List RawBlock × LinkDefs :=
   let (st2, _) := st1.closeFramesTo 0
   (st2.rootSiblings.toList, st2.linkDefs)
 
-def normalizeGo : List Char → List Char
-  | [] => []
-  | '\r' :: '\n' :: rest => '\n' :: normalizeGo rest
-  | '\r' :: rest => '\n' :: normalizeGo rest
-  | c :: rest => c :: normalizeGo rest
+-- Tail-recursive (accumulate reversed, reverse once at the end) rather than the more
+-- obvious `c :: normalizeGo rest`: that form isn't a tail call, so it holds one stack
+-- frame per input character, which risks overflowing the stack on a large document.
+def normalizeGo (acc : List Char) : List Char → List Char
+  | [] => acc.reverse
+  | '\r' :: '\n' :: rest => normalizeGo ('\n' :: acc) rest
+  | '\r' :: rest => normalizeGo ('\n' :: acc) rest
+  | c :: rest => normalizeGo (c :: acc) rest
 
 def normalizeNewlines (s : String) : String :=
-  String.ofList (normalizeGo s.toList)
+  String.ofList (normalizeGo [] s.toList)
 
 def splitLines (s : String) : List String :=
   let parts := (normalizeNewlines s).splitOn "\n"
