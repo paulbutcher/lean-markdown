@@ -1,0 +1,6 @@
+name = "lean-commonmark"
+version = "0.1.0"
+defaultTargets = ["LeanCommonmark"]
+
+[[lean_lib]]
+name = "LeanCommonmark"
