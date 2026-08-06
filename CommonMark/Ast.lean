@@ -2,7 +2,15 @@
 namespace CommonMark
 
 inductive Inline where
-  | text (s : String)
+  | text       (s : String)
+  | code       (s : String)
+  | emph       (content : List Inline)
+  | strong     (content : List Inline)
+  | link       (dest : String) (title : Option String) (content : List Inline)
+  | image      (dest : String) (title : Option String) (content : List Inline)
+  | htmlInline (s : String)
+  | softBreak
+  | lineBreak
   deriving Repr, BEq
 
 inductive ListType where

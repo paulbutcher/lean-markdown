@@ -43,14 +43,6 @@ def stripLeadingWs (s : String) : String :=
 def stripTrailingWs (s : String) : String :=
   String.ofList (s.toList.reverse.dropWhile (fun c => c == ' ' || c == '\t') |>.reverse)
 
-def toLowerStr (s : String) : String :=
-  String.ofList (s.toList.map Char.toLower)
-
-def isPrefixOfChars : List Char → List Char → Bool
-  | [], _ => true
-  | _ :: _, [] => false
-  | a :: as, b :: bs => a == b && isPrefixOfChars as bs
-
 def containsSubstrChars : List Char → List Char → Bool
   | [], needle => needle.isEmpty
   | h :: t, needle => isPrefixOfChars needle (h :: t) || containsSubstrChars t needle
@@ -327,7 +319,12 @@ def matchLinkRefDef (line : String) : Option (String × String × Option String)
       | _ => none
     | _ => none
 
-def startsNewBlock (remainder : String) : Bool :=
+-- `strictListInterrupt` applies the "ordered lists can only interrupt a paragraph if they
+-- start at 1" rule. That rule exists to stop plain text like "2. bar" from accidentally
+-- starting a list where none was already open; it does not apply when the paragraph being
+-- considered is itself the content of an already-open list item (i.e. deciding whether that
+-- list continues with a new sibling item, not whether a list starts fresh).
+def startsNewBlock (strictListInterrupt : Bool) (remainder : String) : Bool :=
   isBlank remainder
   || matchThematicBreak remainder
   || (matchAtxHeading remainder).isSome
@@ -335,7 +332,8 @@ def startsNewBlock (remainder : String) : Bool :=
   || (matchHtmlBlockStart remainder true).isSome
   || (matchBlockQuoteStart remainder).isSome
   || (match matchListMarker remainder with
-      | some (kind, _, afterMarker) => listMarkerCanInterrupt kind afterMarker
+      | some (kind, _, afterMarker) =>
+        !isBlank afterMarker && (!strictListInterrupt || listMarkerCanInterrupt kind afterMarker)
       | none => false)
 
 inductive RawBlock where
@@ -548,7 +546,7 @@ def processLine (st : State) (line : String) : State :=
           let text := String.intercalate "\n" lines.toList
           ({ st with leaf := .empty }).pushBlock (.heading level text)
         | none =>
-          if startsNewBlock remainder then
+          if startsNewBlock true remainder then
             startBlockFrom st.closeLeaf remainder none
           else
             st.appendParagraphLine (stripLeadingWs remainder)
@@ -556,7 +554,7 @@ def processLine (st : State) (line : String) : State :=
   else
     match st.leaf with
     | .paragraph _ =>
-      if isBlank remainder || startsNewBlock remainder then
+      if isBlank remainder || startsNewBlock false remainder then
         let st1 := st.closeLeaf
         let (st2, carry) := st1.closeFramesTo m
         if isBlank remainder then st2.markPendingBlank
@@ -572,10 +570,10 @@ def processLine (st : State) (line : String) : State :=
 def runLines (lines : List String) : State :=
   lines.foldl processLine initialState
 
-def finalizeState (st : State) : List RawBlock :=
+def finalizeState (st : State) : List RawBlock × LinkDefs :=
   let st1 := st.closeLeaf
   let (st2, _) := st1.closeFramesTo 0
-  st2.rootSiblings.toList
+  (st2.rootSiblings.toList, st2.linkDefs)
 
 def normalizeGo : List Char → List Char
   | [] => []
@@ -620,36 +618,37 @@ end
 -- termination checker, so recursion is instead driven by an explicit fuel value (bounded
 -- by the total node count, which is always enough since no subtree exceeds the whole tree).
 mutual
-def rawBlockToBlockF : Nat → RawBlock → CommonMark.Block
+def rawBlockToBlockF (defs : LinkDefs) : Nat → RawBlock → CommonMark.Block
   | 0, _ => .paragraph []
-  | _ + 1, .paragraph text => .paragraph [.text text]
-  | _ + 1, .heading level text => .heading (headingLevelToFin level) [.text text]
+  | _ + 1, .paragraph text => .paragraph (parseInline defs text)
+  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInline defs text)
   | _ + 1, .codeBlock info lit => .codeBlock info lit
   | _ + 1, .thematicBreak => .thematicBreak
   | _ + 1, .htmlBlock s => .htmlBlock s
-  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF fuel content)
-  | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF fuel content]
+  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF defs fuel content)
+  | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF defs fuel content]
 
-def groupAndConvertF : Nat → List RawBlock → List CommonMark.Block
+def groupAndConvertF (defs : LinkDefs) : Nat → List RawBlock → List CommonMark.Block
   | 0, _ => []
   | _ + 1, [] => []
   | fuel + 1, .listItem kind loose content :: rest =>
     let (siblings, rest') := takeSameKindItems kind rest
     let allItems := (kind, loose, content) :: siblings
     let looseOverall := allItems.any (fun (_, l, _) => l)
-    let items := allItems.map (fun (_, _, c) => groupAndConvertF fuel c)
-    .list kind (!looseOverall) items :: groupAndConvertF fuel rest'
-  | fuel + 1, b :: rest => rawBlockToBlockF fuel b :: groupAndConvertF fuel rest
+    let items := allItems.map (fun (_, _, c) => groupAndConvertF defs fuel c)
+    .list kind (!looseOverall) items :: groupAndConvertF defs fuel rest'
+  | fuel + 1, b :: rest => rawBlockToBlockF defs fuel b :: groupAndConvertF defs fuel rest
 end
 
-def groupAndConvert (blocks : List RawBlock) : List CommonMark.Block :=
-  groupAndConvertF (rawBlockListCount blocks + 1) blocks
+def groupAndConvert (defs : LinkDefs) (blocks : List RawBlock) : List CommonMark.Block :=
+  groupAndConvertF defs (rawBlockListCount blocks + 1) blocks
 
 end CommonMark.Parser
 
 namespace CommonMark
 
 def parseDocument (s : String) : Document :=
-  Parser.groupAndConvert (Parser.finalizeState (Parser.runLines (Parser.splitLines s)))
+  let (blocks, defs) := Parser.finalizeState (Parser.runLines (Parser.splitLines s))
+  Parser.groupAndConvert defs blocks
 
 end CommonMark
