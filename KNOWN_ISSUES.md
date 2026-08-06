@@ -1,8 +1,7 @@
 # Known Issues
 
 Places where the implementation passes the full official CommonMark 0.31.2 example
-suite (652/652, including the `native_decide` conformance theorem in
-`test/Conformance.lean`) but does not fully match the letter of the spec, because the
+suite but does not fully match the letter of the spec, because the
 spec examples don't happen to exercise the gap.
 
 ## 1. Unicode punctuation/symbol classification is a hand-picked subset
@@ -15,8 +14,7 @@ ranges (e.g. CJK punctuation, most of the General Punctuation block, mathematica
 operators, emoji) are misclassified as non-punctuation for flanking purposes.
 
 Fix would mean generating a full P*/S* range table from `UnicodeData.txt` and
-switching the lookup from a linear list scan to binary search over sorted ranges
-(a linear scan isn't viable at the resulting range count, a few thousand).
+switching the lookup from a linear list scan to binary search over sorted ranges.
 
 ## 2. Unicode whitespace classification for flanking is ASCII + NBSP only
 
@@ -26,8 +24,7 @@ Unicode `White_Space` property. It only recognizes ASCII whitespace plus U+00A0
 U+205F, U+3000, etc.) aren't recognized, so flanking computed around them can be
 wrong.
 
-Same fix shape as #1: generate the range table from `PropList.txt` (much smaller,
-on the order of two dozen ranges).
+Same fix shape as #1: generate the range table from `PropList.txt`.
 
 ## 3. Case folding for reference-label matching is a hand-picked subset
 
@@ -52,16 +49,10 @@ surrogate range 0xD800-0xDFFF (e.g. input `&#xD800;`). For a surrogate value,
 `Char.ofNat` silently substitutes `'\0'` instead of raising or signalling failure
 (this is documented Lean core behavior: "If the `Nat` does not encode a valid
 Unicode scalar value, `'\0'` is returned instead"), so those references currently
-render as NUL rather than U+FFFD.
-
-Unlike #1-#3, this isn't a data-completeness gap, it's a one-line guard fix: also
-reject `0xD800 <= cp && cp <= 0xDFFF` in `codepointToStr`.
+render as NUL rather than U+FFFD..
 
 ## Notes
 
-- None of the above are exercised by the official example suite, which is why they
-  survived Phase 5 despite 100% conformance against it.
-- Items #1-#3 all follow the same shape: the spec formally depends on Unicode
-  Character Database tables, and the implementation currently substitutes a
-  hand-picked subset of ranges sized to what the example suite needed rather than
-  the full tables.
+- None of the above are exercised by the official example suite.
+- All of these would be fixed if Lean had full Unicode character information
+  support.

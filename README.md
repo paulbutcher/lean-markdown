@@ -1,8 +1,7 @@
 # lean-commonmark
 
 A [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) parser and HTML renderer for
-Lean 4: a from-scratch reimplementation with a plain immutable AST, not a port of the
-JS/C reference implementations' mutable `Node` graph.
+Lean 4.
 
 ## Guarantees
 
@@ -64,26 +63,16 @@ Add to your `lakefile.toml`:
 [[require]]
 name = "commonmark"
 git = "<repository URL>"
-rev = "main"
-```
-
-or, for local development against a sibling checkout:
-
-```toml
-[[require]]
-name = "commonmark"
-path = "../lean-commonmark"
 ```
 
 ## Development
 
 ```
 lake build   # build the library
-lake test    # run the example-suite conformance test (652 examples) and other tests
+lake test    # run the example-suite conformance test and other tests
 ```
 
-See [PLAN.md](PLAN.md) for the project's design goals and phased plan, and
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) for known spec-conformance gaps.
+See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for known spec-conformance gaps.
 
 ## License
 
