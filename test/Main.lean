@@ -5,6 +5,7 @@ import SpecExamples
 import Conformance
 import ZipperLaws
 import EscapingSafety
+import ParserLaws
 
 def checkExample (ex : SpecExample) : IO Bool := do
   let actual := CommonMark.renderHtml (CommonMark.parseDocument ex.markdown)

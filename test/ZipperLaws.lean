@@ -120,4 +120,75 @@ theorem BlockZipper.replace_toDocument (z : BlockZipper) (b : Block) :
 theorem InlineZipper.replace_toDocument (z : InlineZipper) (i : Inline) :
     (z.replace i).toDocument = z.ctx.rebuild (z.leftSiblings.reverse ++ i :: z.rightSiblings) := rfl
 
+-- `insertRight` only touches `rightSiblings`, which `toDocument` doesn't reverse, so this
+-- is `rfl` just like `replace_toDocument`. `insertLeft` touches `leftSiblings`, which
+-- `toDocument` does reverse, so recovering the expected shape needs `List.reverse_cons`.
+
+theorem BlockZipper.insertRight_toDocument (z : BlockZipper) (b : Block) :
+    (z.insertRight b).toDocument =
+      z.ctx.rebuild (z.leftSiblings.reverse ++ z.focus :: b :: z.rightSiblings) := rfl
+
+theorem BlockZipper.insertLeft_toDocument (z : BlockZipper) (b : Block) :
+    (z.insertLeft b).toDocument =
+      z.ctx.rebuild (z.leftSiblings.reverse ++ b :: z.focus :: z.rightSiblings) := by
+  simp [BlockZipper.insertLeft, BlockZipper.toDocument, List.reverse_cons]
+
+theorem InlineZipper.insertRight_toDocument (z : InlineZipper) (i : Inline) :
+    (z.insertRight i).toDocument =
+      z.ctx.rebuild (z.leftSiblings.reverse ++ z.focus :: i :: z.rightSiblings) := rfl
+
+theorem InlineZipper.insertLeft_toDocument (z : InlineZipper) (i : Inline) :
+    (z.insertLeft i).toDocument =
+      z.ctx.rebuild (z.leftSiblings.reverse ++ i :: z.focus :: z.rightSiblings) := by
+  simp [InlineZipper.insertLeft, InlineZipper.toDocument, List.reverse_cons]
+
+-- `nextItem`/`prevItem` are not mutual inverses the way `left`/`right` are: each always
+-- resets its own side to `[]` (first block of the next item; last block of the previous
+-- one), rather than preserving the full sibling list the way `left`/`right` do. So
+-- `prevItem (nextItem z) = some z` only when `z` was already at the end of its own item
+-- (`z.rightSiblings = []`), i.e. exactly the position `prevItem` would itself produce;
+-- otherwise `prevItem` lands on the true last block of that item, not literally `z`. This
+-- mirrors why `down_up` holds unconditionally but `up_down` does not.
+
+theorem BlockZipper.nextItem_prevItem {z z' : BlockZipper} (hz : z.rightSiblings = []) :
+    z.nextItem = some z' → z'.prevItem = some z := by
+  obtain ⟨focus, ls, rs, ctx⟩ := z
+  simp only at hz
+  subst hz
+  cases ctx with
+  | root => simp [BlockZipper.nextItem]
+  | blockQuote left right up => simp [BlockZipper.nextItem]
+  | listItem kind tight leftItems rightItems left right up =>
+    cases rightItems with
+    | nil => simp [BlockZipper.nextItem]
+    | cons nextContent restItems =>
+      cases nextContent with
+      | nil => simp [BlockZipper.nextItem]
+      | cons b restBlocks =>
+        simp only [BlockZipper.nextItem, Option.some.injEq]
+        rintro rfl
+        simp [BlockZipper.prevItem]
+
+theorem BlockZipper.prevItem_nextItem {z z' : BlockZipper} (hz : z.leftSiblings = []) :
+    z.prevItem = some z' → z'.nextItem = some z := by
+  obtain ⟨focus, ls, rs, ctx⟩ := z
+  simp only at hz
+  subst hz
+  cases ctx with
+  | root => simp [BlockZipper.prevItem]
+  | blockQuote left right up => simp [BlockZipper.prevItem]
+  | listItem kind tight leftItems rightItems left right up =>
+    cases leftItems with
+    | nil => simp [BlockZipper.prevItem]
+    | cons prevContent restItems =>
+      cases hrev : prevContent.reverse with
+      | nil => simp [BlockZipper.prevItem, hrev]
+      | cons b restBlocksRev =>
+        have hp : prevContent = restBlocksRev.reverse ++ [b] := by
+          have h := congrArg List.reverse hrev
+          simpa [List.reverse_cons] using h
+        simp only [BlockZipper.prevItem, hrev, Option.some.injEq]
+        rintro rfl
+        simp [BlockZipper.nextItem, hp]
+
 end CommonMark

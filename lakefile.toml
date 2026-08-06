@@ -14,7 +14,7 @@ name = "CommonMark"
 [[lean_lib]]
 name = "TestData"
 srcDir = "test"
-globs = ["SpecExamples", "Conformance", "ZipperLaws", "EscapingSafety"]
+globs = ["SpecExamples", "Conformance", "ZipperLaws", "EscapingSafety", "ParserLaws"]
 
 [[lean_exe]]
 name = "test"
