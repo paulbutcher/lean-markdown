@@ -1,6 +1,17 @@
-name = "lean-commonmark"
+name = "commonmark"
 version = "0.1.0"
-defaultTargets = ["LeanCommonmark"]
+defaultTargets = ["CommonMark"]
+testDriver = "test"
+
+[[require]]
+name = "plausible"
+git = "https://github.com/leanprover-community/plausible"
+rev = "v4.32.0"
 
 [[lean_lib]]
-name = "LeanCommonmark"
+name = "CommonMark"
+
+[[lean_exe]]
+name = "test"
+srcDir = "test"
+root = "Main"
