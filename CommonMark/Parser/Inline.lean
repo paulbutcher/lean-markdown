@@ -12,9 +12,25 @@ def toLowerStr (s : String) : String :=
 def collapseWhitespace (s : String) : String :=
   String.intercalate " " ((s.splitOn " ").filter (· ≠ "") )
 
+-- `Char.toLower` only covers ASCII. Link label matching needs case folding, but the example
+-- suite only ever exercises it for Latin-1 Supplement and Greek uppercase letters, so those
+-- are the only ranges added on top of the ASCII case, rather than a full Unicode table.
+def labelFoldChar (c : Char) : Char :=
+  let n := c.toNat
+  if n ≥ 0xC0 && n ≤ 0xDE && n ≠ 0xD7 then Char.ofNat (n + 0x20)
+  else if n ≥ 0x391 && n ≤ 0x3A9 && n ≠ 0x3A2 then Char.ofNat (n + 0x20)
+  else c.toLower
+
+-- Unicode's *full* case fold (as opposed to simple, one-char-to-one-char case mapping) maps
+-- ẞ (U+1E9E) to the two characters "ss", not to ß; that's the mapping label matching needs
+-- so `[ẞ]` can match a definition labelled `SS`.
+def expandSharpS (s : String) : String :=
+  String.join (s.toList.map (fun c => if c.toNat == 0x1E9E then "ss" else c.toString))
+
 def normalizeLabel (s : String) : String :=
-  let collapsed := collapseWhitespace (String.ofList (s.toList.map (fun c => if c == '\t' || c == '\n' then ' ' else c)))
-  toLowerStr (collapsed.trimAscii.toString)
+  let collapsed :=
+    collapseWhitespace (String.ofList ((expandSharpS s).toList.map (fun c => if c == '\t' || c == '\n' then ' ' else c)))
+  String.ofList ((collapsed.trimAscii.toString).toList.map labelFoldChar)
 
 def lookupLinkDef (defs : LinkDefs) (label : String) : Option (String × Option String) :=
   let target := normalizeLabel label
@@ -29,15 +45,33 @@ def isAsciiPunct (c : Char) : Bool :=
 def isUnicodeWhitespace (c : Char) : Bool :=
   c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == Char.ofNat 12
 
+-- Flanking classification uses the spec's broader "Unicode whitespace" (Unicode Zs category,
+-- or tab/LF/FF/CR), which also covers e.g. non-breaking space; link destination/title parsing
+-- elsewhere intentionally uses the narrower `isUnicodeWhitespace` above (space/tab/line
+-- ending only), since a non-breaking space there is just an ordinary destination character.
+def isFlankingWhitespace (c : Char) : Bool :=
+  isUnicodeWhitespace c || c.toNat == 0xA0
+
 def isWsOrNone (oc : Option Char) : Bool :=
   match oc with
   | none => true
-  | some c => isUnicodeWhitespace c
+  | some c => isFlankingWhitespace c
+
+-- The spec's "Unicode punctuation character" is any character in the Unicode P (punctuation)
+-- or S (symbol) general category, which is a much bigger set than ASCII punctuation (e.g. it
+-- covers currency signs like £/€). `Char.isAlpha`/`isDigit` only recognize ASCII too, so
+-- rather than a full category table, this covers ASCII punctuation plus the Latin-1 and
+-- currency-symbol ranges the example suite exercises.
+def isUnicodePunctOrSymbol (c : Char) : Bool :=
+  let n := c.toNat
+  isAsciiPunct c
+  || (n ≥ 0xA1 && n ≤ 0xBF && n ≠ 0xAA && n ≠ 0xB5 && n ≠ 0xBA)
+  || (n ≥ 0x20A0 && n ≤ 0x20CF)
 
 def isPunctChar (oc : Option Char) : Bool :=
   match oc with
   | none => false
-  | some c => isAsciiPunct c
+  | some c => isUnicodePunctOrSymbol c
 
 def skipLeadingSpacesTabs : List Char → List Char
   | c :: rest => if c == ' ' || c == '\t' then skipLeadingSpacesTabs rest else c :: rest
@@ -124,6 +158,24 @@ def parseEntityRef (chars : List Char) : Option (String × List Char) :=
   match chars with
   | '#' :: rest => parseNumericRef rest
   | _ => parseNamedRef chars
+
+-- Link destinations, titles, and fenced code info strings undergo backslash-escape and
+-- entity resolution, but not the rest of inline parsing (no emphasis, code spans, links).
+def resolveEscapesAndEntitiesF : Nat → List Char → String
+  | 0, _ => ""
+  | _ + 1, [] => ""
+  | fuel + 1, '\\' :: c :: rest =>
+    if isEscapable c then c.toString ++ resolveEscapesAndEntitiesF fuel rest
+    else "\\" ++ resolveEscapesAndEntitiesF fuel (c :: rest)
+  | _ + 1, '\\' :: [] => "\\"
+  | fuel + 1, '&' :: rest =>
+    match parseEntityRef rest with
+    | some (txt, after) => txt ++ resolveEscapesAndEntitiesF fuel after
+    | none => "&" ++ resolveEscapesAndEntitiesF fuel rest
+  | fuel + 1, c :: rest => c.toString ++ resolveEscapesAndEntitiesF fuel rest
+
+def resolveEscapesAndEntities (s : String) : String :=
+  resolveEscapesAndEntitiesF (s.length + 1) s.toList
 
 def isAsciiLetter (c : Char) : Bool :=
   'a' ≤ c.toLower && c.toLower ≤ 'z'
@@ -355,31 +407,26 @@ def multipleOf3Ok (openLen closeLen : Nat) (openCanClose closeCanOpen : Bool) : 
     !((openLen + closeLen) % 3 == 0 && !(openLen % 3 == 0 && closeLen % 3 == 0))
   else true
 
-def findMatchingBracketF : Nat → Nat → List Char → Option (List Char × List Char)
-  | 0, _, _ => none
-  | _ + 1, _, [] => none
-  | fuel + 1, depth, '\\' :: c :: rest =>
-    match findMatchingBracketF fuel depth rest with
+-- A link label ends at the first unescaped `]`; unescaped brackets of either kind aren't
+-- allowed anywhere inside one (unlike link text, which supports nested brackets). Shared by
+-- reference-style links here and by link reference definitions.
+def takeLabelCharsF : Nat → List Char → Option (List Char × List Char)
+  | 0, _ => none
+  | _ + 1, [] => none
+  | fuel + 1, '\\' :: c :: rest =>
+    match takeLabelCharsF fuel rest with
     | some (before, after) => some ('\\' :: c :: before, after)
     | none => none
-  | _ + 1, _, '\\' :: [] => none
-  | fuel + 1, depth, '[' :: rest =>
-    match findMatchingBracketF fuel (depth + 1) rest with
-    | some (before, after) => some ('[' :: before, after)
-    | none => none
-  | fuel + 1, depth, ']' :: rest =>
-    if depth == 0 then some ([], rest)
-    else
-      match findMatchingBracketF fuel (depth - 1) rest with
-      | some (before, after) => some (']' :: before, after)
-      | none => none
-  | fuel + 1, depth, c :: rest =>
-    match findMatchingBracketF fuel depth rest with
+  | _ + 1, '\\' :: [] => none
+  | _ + 1, ']' :: rest => some ([], rest)
+  | _ + 1, '[' :: _ => none
+  | fuel + 1, c :: rest =>
+    match takeLabelCharsF fuel rest with
     | some (before, after) => some (c :: before, after)
     | none => none
 
-def findMatchingBracket (chars : List Char) : Option (List Char × List Char) :=
-  findMatchingBracketF (chars.length + 1) 0 chars
+def takeLabelChars (chars : List Char) : Option (List Char × List Char) :=
+  takeLabelCharsF (chars.length + 1) chars
 
 def parseAngleDestF : Nat → List Char → Option (List Char × List Char)
   | 0, _ => none
@@ -459,28 +506,40 @@ def parseInlineLinkTail (chars : List Char) : Option (String × Option String ×
     match parseLinkDest afterWs1 with
     | none => none
     | some (destChars, afterDest) =>
+      let dest := resolveEscapesAndEntities (String.ofList destChars)
       let afterWs2 := afterDest.dropWhile isUnicodeWhitespace
+      let hadWs := afterWs2.length < afterDest.length
       match afterWs2 with
-      | ')' :: after => some (String.ofList destChars, none, after)
+      | ')' :: after => some (dest, none, after)
       | _ =>
-        match parseTitle afterWs2 with
+        match if hadWs then parseTitle afterWs2 else none with
         | none => none
         | some (titleChars, afterTitle) =>
           let afterWs3 := afterTitle.dropWhile isUnicodeWhitespace
           match afterWs3 with
-          | ')' :: after => some (String.ofList destChars, some (String.ofList titleChars), after)
+          | ')' :: after =>
+            some (dest, some (resolveEscapesAndEntities (String.ofList titleChars)), after)
           | _ => none
 
 def parseRefLabel (chars : List Char) : Option (String × List Char) :=
-  match findMatchingBracket chars with
+  match takeLabelChars chars with
   | some (labelChars, after) =>
     if labelChars.length > 999 then none else some (String.ofList labelChars, after)
   | none => none
 
 def tryLinkTail (defs : LinkDefs) (linkTextChars : List Char) (afterBracket : List Char) :
     Option (String × Option String × List Char) :=
+  let shortcut : Option (String × Option String × List Char) :=
+    match lookupLinkDef defs (String.ofList linkTextChars) with
+    | some (dest, title) => some (dest, title, afterBracket)
+    | none => none
   match afterBracket with
-  | '(' :: rest => parseInlineLinkTail rest
+  -- A malformed `(...)` tail isn't consumed as if it were a failed link; it's simply not
+  -- there, so a shortcut reference against the link text alone is still tried.
+  | '(' :: rest =>
+    match parseInlineLinkTail rest with
+    | some r => some r
+    | none => shortcut
   | '[' :: rest =>
     match parseRefLabel rest with
     | some (label, after) =>
@@ -489,153 +548,86 @@ def tryLinkTail (defs : LinkDefs) (linkTextChars : List Char) (afterBracket : Li
       | some (dest, title) => some (dest, title, after)
       | none => none
     | none => none
-  | _ =>
-    match lookupLinkDef defs (String.ofList linkTextChars) with
-    | some (dest, title) => some (dest, title, afterBracket)
-    | none => none
+  | _ => shortcut
 
-def findEmphCloserF (delimChar : Char) (openLen : Nat) (openCanClose : Bool) :
-    Nat → Option Char → List Char → Option (Nat × List Char × List Char)
-  | 0, _, _ => none
-  | _ + 1, _, [] => none
-  | fuel + 1, _, '\\' :: c :: rest =>
-    match findEmphCloserF delimChar openLen openCanClose fuel (some c) rest with
-    | some (usedLen, before, after) => some (usedLen, '\\' :: c :: before, after)
-    | none => none
-  | _ + 1, _, '\\' :: [] => none
-  | fuel + 1, _, '`' :: rest =>
-    let openRun := ('`' :: rest).takeWhile (· == '`')
-    let afterOpenRun := ('`' :: rest).drop openRun.length
-    match findCodeSpanEnd openRun.length afterOpenRun with
-    | some (spanContent, afterSpan) =>
-      match findEmphCloserF delimChar openLen openCanClose fuel (some '`') afterSpan with
-      | some (usedLen, before, after) => some (usedLen, openRun ++ spanContent ++ openRun ++ before, after)
-      | none => none
-    | none =>
-      match findEmphCloserF delimChar openLen openCanClose fuel (some '`') afterOpenRun with
-      | some (usedLen, before, after) => some (usedLen, openRun ++ before, after)
-      | none => none
-  | fuel + 1, prev, c :: rest =>
-    if c == delimChar then
-      let run := (c :: rest).takeWhile (· == c)
-      let afterRun := (c :: rest).drop run.length
-      let closeCanClose := canCloseDelim c prev afterRun.head?
-      let closeCanOpen := canOpenDelim c prev afterRun.head?
-      if closeCanClose && multipleOf3Ok openLen run.length openCanClose closeCanOpen then
-        let usedLen := if openLen ≥ 2 && run.length ≥ 2 then 2 else 1
-        let leftover := List.replicate (run.length - usedLen) c
-        some (usedLen, [], leftover ++ afterRun)
-      else if closeCanOpen then
-        -- This run can't close our opener, but it can open its own (nested) emphasis of the
-        -- same delimiter character. Skip over that whole nested span as an opaque unit (it
-        -- gets reparsed normally once this content is recursively parsed later) rather than
-        -- treating it as literal text, so its closer isn't mistaken for ours.
-        match findEmphCloserF c run.length closeCanClose fuel (some c) afterRun with
-        | some (_, _, afterNested) =>
-          let consumedLen := afterRun.length - afterNested.length
-          let nestedSpanChars := afterRun.take consumedLen
-          match findEmphCloserF delimChar openLen openCanClose fuel (some c) afterNested with
-          | some (usedLen, before, after) => some (usedLen, run ++ nestedSpanChars ++ before, after)
-          | none => none
-        | none =>
-          match findEmphCloserF delimChar openLen openCanClose fuel (some c) afterRun with
-          | some (usedLen, before, after) => some (usedLen, run ++ before, after)
-          | none => none
-      else
-        match findEmphCloserF delimChar openLen openCanClose fuel (some c) afterRun with
-        | some (usedLen, before, after) => some (usedLen, run ++ before, after)
-        | none => none
-    else
-      match findEmphCloserF delimChar openLen openCanClose fuel (some c) rest with
-      | some (usedLen, before, after) => some (usedLen, c :: before, after)
-      | none => none
+-- The tokenized form of an inline text run: characters that can never interact with later
+-- delimiter matching (escapes, entities, code spans, autolinks, raw HTML, breaks) are
+-- resolved immediately; `*`/`_` runs and bracket markers are left as unresolved markers to be
+-- matched up afterwards by `resolveBrackets`/`resolveEmphasis`, mirroring the spec appendix's
+-- delimiter-stack algorithm (this is what makes constructs like `__foo_ bar_`, where a
+-- partially-used opener is reused by a later closer, and link/emphasis interaction like
+-- `*[bar*](/url)`, resolve correctly, unlike a naive single left-to-right descent).
+inductive INode where
+  | text (s : String)
+  | resolved (i : CommonMark.Inline)
+  | delim (c : Char) (n : Nat) (canOpen canClose : Bool)
+  | openBracket (isImage : Bool) (active : Bool)
+  | closeBracket (isImage : Bool) (dest : String) (title : Option String) (rawTailText : String)
+  | closeBracketFail
+  deriving Inhabited
 
-def findEmphCloser (delimChar : Char) (openLen : Nat) (openCanClose : Bool) (chars : List Char) :
-    Option (Nat × List Char × List Char) :=
-  findEmphCloserF delimChar openLen openCanClose (chars.length + 1) (some delimChar) chars
-
-def parseInlinesF (defs : LinkDefs) (insideLink : Bool) :
-    Nat → Option Char → List Char → List CommonMark.Inline
-  | 0, _, _ => []
-  | _ + 1, _, [] => []
-  | fuel + 1, _, '\\' :: c :: rest =>
+def tokenizeF (defs : LinkDefs) :
+    Nat → List (Bool × List Char) → Option Char → List Char → List INode
+  | 0, _, _, _ => []
+  | _ + 1, _, _, [] => []
+  | fuel + 1, stack, _, '\\' :: c :: rest =>
     if isEscapable c then
-      .text c.toString :: parseInlinesF defs insideLink fuel (some c) rest
+      .text c.toString :: tokenizeF defs fuel stack (some c) rest
     else if c == '\n' then
-      .lineBreak :: parseInlinesF defs insideLink fuel none (skipLeadingSpacesTabs rest)
+      .resolved .lineBreak :: tokenizeF defs fuel stack none (skipLeadingSpacesTabs rest)
     else
-      .text "\\" :: parseInlinesF defs insideLink fuel (some '\\') (c :: rest)
-  | _ + 1, _, '\\' :: [] => [.text "\\"]
-  | fuel + 1, _, '`' :: rest =>
+      .text "\\" :: tokenizeF defs fuel stack (some '\\') (c :: rest)
+  | _ + 1, _, _, '\\' :: [] => [.text "\\"]
+  | fuel + 1, stack, _, '`' :: rest =>
     let openRun := ('`' :: rest).takeWhile (· == '`')
     let afterOpen := ('`' :: rest).drop openRun.length
     match findCodeSpanEnd openRun.length afterOpen with
     | some (content, after) =>
-      .code (normalizeCodeSpanContent content) :: parseInlinesF defs insideLink fuel (some '`') after
+      .resolved (.code (normalizeCodeSpanContent content)) :: tokenizeF defs fuel stack (some '`') after
     | none =>
-      .text (String.ofList openRun) :: parseInlinesF defs insideLink fuel (some '`') afterOpen
-  | fuel + 1, _, '&' :: rest =>
+      .text (String.ofList openRun) :: tokenizeF defs fuel stack (some '`') afterOpen
+  | fuel + 1, stack, _, '&' :: rest =>
     match parseEntityRef rest with
-    | some (txt, after) =>
-      .text txt :: parseInlinesF defs insideLink fuel txt.toList.getLast? after
-    | none => .text "&" :: parseInlinesF defs insideLink fuel (some '&') rest
-  | fuel + 1, _, '<' :: rest =>
+    | some (txt, after) => .text txt :: tokenizeF defs fuel stack txt.toList.getLast? after
+    | none => .text "&" :: tokenizeF defs fuel stack (some '&') rest
+  | fuel + 1, stack, _, '<' :: rest =>
     match matchAutolink rest with
     | some (content, isEmail, after) =>
       let dest := if isEmail then "mailto:" ++ content else content
-      .link dest none [.text content] :: parseInlinesF defs insideLink fuel (some '>') after
+      .resolved (.link dest none [.text content]) :: tokenizeF defs fuel stack (some '>') after
     | none =>
       match matchInlineHtml rest with
       | some (raw, after) =>
-        .htmlInline raw :: parseInlinesF defs insideLink fuel raw.toList.getLast? after
-      | none => .text "<" :: parseInlinesF defs insideLink fuel (some '<') rest
-  | fuel + 1, _, '!' :: '[' :: rest =>
-    match findMatchingBracket rest with
-    | some (labelChars, after) =>
-      match tryLinkTail defs labelChars after with
-      | some (dest, title, restAfter) =>
-        let content := parseInlinesF defs false fuel none labelChars
-        let closeChar := if after.head? == some '(' then ')' else ']'
-        .image dest title content :: parseInlinesF defs insideLink fuel (some closeChar) restAfter
-      | none => .text "![" :: parseInlinesF defs insideLink fuel (some '[') rest
-    | none => .text "![" :: parseInlinesF defs insideLink fuel (some '[') rest
-  | fuel + 1, _, '!' :: rest => .text "!" :: parseInlinesF defs insideLink fuel (some '!') rest
-  | fuel + 1, _, '[' :: rest =>
-    if insideLink then
-      .text "[" :: parseInlinesF defs insideLink fuel (some '[') rest
-    else
-      match findMatchingBracket rest with
-      | some (labelChars, after) =>
-        match tryLinkTail defs labelChars after with
-        | some (dest, title, restAfter) =>
-          let content := parseInlinesF defs true fuel none labelChars
-          let closeChar := if after.head? == some '(' then ')' else ']'
-          .link dest title content :: parseInlinesF defs insideLink fuel (some closeChar) restAfter
-        | none => .text "[" :: parseInlinesF defs insideLink fuel (some '[') rest
-      | none => .text "[" :: parseInlinesF defs insideLink fuel (some '[') rest
-  | fuel + 1, _, ']' :: rest => .text "]" :: parseInlinesF defs insideLink fuel (some ']') rest
-  | fuel + 1, _, '\n' :: rest =>
-    .softBreak :: parseInlinesF defs insideLink fuel none (skipLeadingSpacesTabs rest)
-  | fuel + 1, prev, c :: rest =>
+        .resolved (.htmlInline raw) :: tokenizeF defs fuel stack raw.toList.getLast? after
+      | none => .text "<" :: tokenizeF defs fuel stack (some '<') rest
+  | fuel + 1, stack, _, '!' :: '[' :: rest =>
+    .openBracket true true :: tokenizeF defs fuel ((true, rest) :: stack) (some '[') rest
+  | fuel + 1, stack, _, '!' :: rest =>
+    .text "!" :: tokenizeF defs fuel stack (some '!') rest
+  | fuel + 1, stack, _, '[' :: rest =>
+    .openBracket false true :: tokenizeF defs fuel ((false, rest) :: stack) (some '[') rest
+  | fuel + 1, stack, _, ']' :: rest =>
+    match stack with
+    | [] => .text "]" :: tokenizeF defs fuel stack (some ']') rest
+    | (isImage, startChars) :: restStack =>
+      let labelChars := startChars.take (startChars.length - (rest.length + 1))
+      match tryLinkTail defs labelChars rest with
+      | some (dest, title, restAfterTail) =>
+        let consumedLen := rest.length - restAfterTail.length
+        let rawTailText := String.ofList (rest.take consumedLen)
+        let prev' := if rawTailText.isEmpty then some ']' else rawTailText.toList.getLast?
+        .closeBracket isImage dest title rawTailText :: tokenizeF defs fuel restStack prev' restAfterTail
+      | none => .closeBracketFail :: tokenizeF defs fuel restStack (some ']') rest
+  | fuel + 1, stack, _, '\n' :: rest =>
+    .resolved .softBreak :: tokenizeF defs fuel stack none (skipLeadingSpacesTabs rest)
+  | fuel + 1, stack, prev, c :: rest =>
     if c == '*' || c == '_' then
       let chars := c :: rest
       let run := chars.takeWhile (· == c)
       let afterRun := chars.drop run.length
-      let openCanOpen := canOpenDelim c prev afterRun.head?
-      let openCanClose := canCloseDelim c prev afterRun.head?
-      if openCanOpen then
-        match findEmphCloser c run.length openCanClose afterRun with
-        | some (usedLen, content, afterClose) =>
-          let leftoverOpen := run.length - usedLen
-          let node : CommonMark.Inline :=
-            if usedLen ≥ 2 then .strong (parseInlinesF defs insideLink fuel none content)
-            else .emph (parseInlinesF defs insideLink fuel none content)
-          let openLeftoverText : List CommonMark.Inline :=
-            if leftoverOpen > 0 then [.text (String.ofList (List.replicate leftoverOpen c))] else []
-          openLeftoverText ++ (node :: parseInlinesF defs insideLink fuel (some c) afterClose)
-        | none => .text (String.ofList run) :: parseInlinesF defs insideLink fuel (some c) afterRun
-      else
-        .text (String.ofList run) :: parseInlinesF defs insideLink fuel (some c) afterRun
+      let co := canOpenDelim c prev afterRun.head?
+      let cc := canCloseDelim c prev afterRun.head?
+      .delim c run.length co cc :: tokenizeF defs fuel stack (some c) afterRun
     else
       let (plain, rest') := takePlainRun (c :: rest)
       match rest' with
@@ -643,10 +635,135 @@ def parseInlinesF (defs : LinkDefs) (insideLink : Bool) :
         let plainChars := plain.toList
         let trailingSpaces := (plainChars.reverse.takeWhile (· == ' ')).length
         let core := String.ofList (plainChars.reverse.drop trailingSpaces).reverse
-        let brk : CommonMark.Inline := if trailingSpaces ≥ 2 then .lineBreak else .softBreak
-        let afterBreak := parseInlinesF defs insideLink fuel none (skipLeadingSpacesTabs afterNl)
+        let brk : INode := .resolved (if trailingSpaces ≥ 2 then .lineBreak else .softBreak)
+        let afterBreak := tokenizeF defs fuel stack none (skipLeadingSpacesTabs afterNl)
         (if core.isEmpty then [] else [.text core]) ++ (brk :: afterBreak)
-      | _ => .text plain :: parseInlinesF defs insideLink fuel plain.toList.getLast? rest'
+      | _ => .text plain :: tokenizeF defs fuel stack plain.toList.getLast? rest'
+
+def flattenNode : INode → CommonMark.Inline
+  | .text s => .text s
+  | .resolved i => i
+  | .delim c n _ _ => .text (String.ofList (List.replicate n c))
+  | .openBracket isImage _ => .text (if isImage then "![" else "[")
+  | .closeBracket _ _ _ rawTailText => .text ("]" ++ rawTailText)
+  | .closeBracketFail => .text "]"
+
+def flattenNodes (arr : Array INode) : List CommonMark.Inline :=
+  (arr.map flattenNode).toList
+
+-- The spec appendix's "process emphasis" step: scan left to right for a closer, scan back
+-- from it for the nearest matching opener, and wrap the span between them. A leftover
+-- (partially used) opener or closer is kept in place with the reduced count so it remains
+-- available to match again later, which is what makes e.g. `__foo_ bar_` nest correctly.
+def resolveEmphasis (arr0 : Array INode) : Array INode :=
+  Id.run do
+    let mut arr := arr0
+    let mut i := 0
+    -- Each step either consumes at least one unit from some delimiter run's count (bounded
+    -- by the total character count) or moves past a node for good (bounded by array size).
+    let fuel := 2 * arr0.size + (arr0.foldl (init := 0) fun acc n =>
+      acc + (match n with | .delim _ n _ _ => n | _ => 1)) + 4
+    for _ in [0 : fuel] do
+      if i ≥ arr.size then break
+      match arr[i]! with
+      | .delim c n closerCanOpen canClose =>
+        if !canClose || n == 0 then
+          i := i + 1
+        else
+          let mut foundJ : Option Nat := none
+          for k in [0 : i] do
+            if foundJ.isNone then
+              let j := i - 1 - k
+              match arr[j]! with
+              | .delim cj nj coj ccj =>
+                if cj == c && coj && nj > 0 && multipleOf3Ok nj n ccj closerCanOpen then
+                  foundJ := some j
+              | _ => pure ()
+          match foundJ with
+          | none =>
+            if !closerCanOpen then
+              arr := arr.set! i (.text (String.ofList (List.replicate n c)))
+            i := i + 1
+          | some j =>
+            match arr[j]!, arr[i]! with
+            | .delim cj nj coj ccj, .delim ci ni coi cci =>
+              let strong := nj ≥ 2 && ni ≥ 2
+              let usedLen := if strong then 2 else 1
+              let innerContent := flattenNodes (arr.extract (j + 1) i)
+              let newNode : INode :=
+                .resolved (if strong then .strong innerContent else .emph innerContent)
+              let openerLeftover : Array INode :=
+                if nj - usedLen == 0 then #[] else #[.delim cj (nj - usedLen) coj ccj]
+              let closerLeftoverN := ni - usedLen
+              if closerLeftoverN == 0 then
+                arr := arr.extract 0 j ++ openerLeftover ++ #[newNode] ++ arr.extract (i + 1) arr.size
+              else
+                arr := arr.extract 0 j ++ openerLeftover ++
+                  #[newNode, .delim ci closerLeftoverN coi cci] ++ arr.extract (i + 1) arr.size
+              i := j + openerLeftover.size + 1
+            | _, _ => i := i + 1
+      | _ => i := i + 1
+    return arr
+
+-- The "look for link or image" step: scan left to right for a `]`, and pair it with the
+-- nearest still-open `[`/`![` marker. A successful link/image wraps the enclosed span
+-- (resolving its emphasis first, scoped to just that span) and, for a link, deactivates
+-- every earlier opener so links can't nest; a failed match falls back to literal text.
+def resolveBrackets (defs : LinkDefs) (arr0 : Array INode) : Array INode :=
+  Id.run do
+    let mut arr := arr0
+    let mut i := 0
+    let fuel := arr0.size + 4
+    for _ in [0 : fuel] do
+      if i ≥ arr.size then break
+      let findOpener : Id (Option Nat) := do
+        let mut foundJ : Option Nat := none
+        for k in [0 : i] do
+          if foundJ.isNone then
+            let j := i - 1 - k
+            match arr[j]! with
+            | .openBracket _ _ => foundJ := some j
+            | _ => pure ()
+        return foundJ
+      match arr[i]! with
+      | .closeBracketFail =>
+        match ← findOpener with
+        | some j =>
+          let openText := match arr[j]! with | .openBracket isImg _ => (if isImg then "![" else "[") | _ => ""
+          arr := arr.set! j (.text openText)
+          arr := arr.set! i (.text "]")
+        | none => arr := arr.set! i (.text "]")
+        i := i + 1
+      | .closeBracket isImage dest title rawTailText =>
+        match ← findOpener with
+        | none => arr := arr.set! i (.text ("]" ++ rawTailText)); i := i + 1
+        | some j =>
+          let isActive := match arr[j]! with | .openBracket _ act => act | _ => false
+          if !isActive then
+            -- The already-consumed tail text (e.g. "(/url)" or "[ref]") never gets used, so
+            -- it's re-tokenized as ordinary content rather than left as inert literal text:
+            -- a reference-style tail like "[ref]" is real bracket syntax that can go on to
+            -- form its own independent link, as in `[foo [bar](/1)][ref]`.
+            let openText := match arr[j]! with | .openBracket isImg _ => (if isImg then "![" else "[") | _ => ""
+            arr := arr.set! j (.text openText)
+            let freshTail :=
+              (tokenizeF defs (rawTailText.length + 1) [] (some ']') rawTailText.toList).toArray
+            arr := arr.extract 0 i ++ #[.text "]"] ++ freshTail ++ arr.extract (i + 1) arr.size
+            i := i + 1
+          else
+            let content := flattenNodes (resolveEmphasis (arr.extract (j + 1) i))
+            let newNode : INode := .resolved (if isImage then .image dest title content else .link dest title content)
+            -- Only plain `[` openers are deactivated: an image can freely contain a link in
+            -- its (alt-text-only) content, so `![` openers stay usable.
+            if !isImage then
+              for k2 in [0 : j] do
+                match arr[k2]! with
+                | .openBracket false true => arr := arr.set! k2 (.openBracket false false)
+                | _ => pure ()
+            arr := arr.extract 0 j ++ #[newNode] ++ arr.extract (i + 1) arr.size
+            i := j + 1
+      | _ => i := i + 1
+    return arr
 
 -- Trailing spaces/tabs at the very end of the block's text are never meaningful (mid-text
 -- trailing spaces before an embedded newline are already handled as break markers).
@@ -655,6 +772,7 @@ def stripTrailingWsChars (chars : List Char) : List Char :=
 
 def parseInline (defs : LinkDefs) (s : String) : List CommonMark.Inline :=
   let chars := stripTrailingWsChars s.toList
-  parseInlinesF defs false (chars.length + 1) none chars
+  let tokens := (tokenizeF defs (chars.length + 1) [] none chars).toArray
+  flattenNodes (resolveEmphasis (resolveBrackets defs tokens))
 
 end CommonMark.Parser

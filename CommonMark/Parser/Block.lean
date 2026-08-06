@@ -13,8 +13,29 @@ def leadingWhitespaceChars (s : String) : List Char :=
 def leadingWhitespaceWidth (s : String) : Nat :=
   columnWidth (leadingWhitespaceChars s)
 
+-- As `leadingWhitespaceWidth`, but for text that doesn't itself start at column 0 (e.g. the
+-- text following a list marker): a tab's expansion depends on its true starting column, so
+-- measuring `chars` in isolation from column 0 would be wrong whenever it starts with a tab.
+def leadingWhitespaceWidthFrom (startCol : Nat) (chars : List Char) : Nat :=
+  let wsChars := chars.takeWhile (fun c => c == ' ' || c == '\t')
+  (wsChars.foldl (fun col c => if c == '\t' then col + (4 - col % 4) else col + 1) startCol) - startCol
+
 def isBlank (s : String) : Bool :=
   s.toList.all (fun c => c == ' ' || c == '\t')
+
+-- Fully expands the leading run of tabs/spaces into literal spaces (tracking true column
+-- position throughout), leaving the rest of the line untouched. Used once a tab has only
+-- been partially consumed by `dropIndentGo`: representing its unconsumed remainder as a bare
+-- '\t' character would make a later, independent width measurement of the resulting string
+-- restart column tracking from 0 and so expand any *further* tabs to the wrong width, since
+-- a tab's expansion depends on which column it actually starts at.
+def expandLeadingTabsGo : List Char → Nat → List Char
+  | [], _ => []
+  | ' ' :: rest, col => ' ' :: expandLeadingTabsGo rest (col + 1)
+  | '\t' :: rest, col =>
+    let nextStop := col + (4 - col % 4)
+    List.replicate (nextStop - col) ' ' ++ expandLeadingTabsGo rest nextStop
+  | rest, _ => rest
 
 def dropIndentGo : List Char → Nat → Nat → List Char
   | [], _, _ => []
@@ -28,7 +49,7 @@ def dropIndentGo : List Char → Nat → Nat → List Char
       if consumed <= remaining then
         dropIndentGo rest nextStop (remaining - consumed)
       else
-        List.replicate (consumed - remaining) ' ' ++ rest
+        List.replicate (consumed - remaining) ' ' ++ expandLeadingTabsGo rest nextStop
     | _ => c :: rest
 
 def dropIndent (s : String) (n : Nat) : String :=
@@ -119,7 +140,7 @@ def matchFenceStart (line : String) : Option (Char × Nat × Nat × Option Strin
           let infoRaw := String.ofList afterFence
           if c == '`' && infoRaw.toList.any (· == '`') then none
           else
-            let info := infoRaw.trimAscii.toString
+            let info := resolveEscapesAndEntities infoRaw.trimAscii.toString
             some (c, fenceLen, w, if info.isEmpty then none else some info)
       else none
     | [] => none
@@ -141,7 +162,7 @@ def matchBlockQuoteStart (line : String) : Option String :=
       let col := w + 1
       let tabWidth := 4 - col % 4
       let extra := tabWidth - 1
-      some (String.ofList (List.replicate extra ' ' ++ rest))
+      some (String.ofList (List.replicate extra ' ' ++ expandLeadingTabsGo rest (col + tabWidth)))
     | '>' :: ' ' :: rest => some (String.ofList rest)
     | '>' :: rest => some (String.ofList rest)
     | _ => none
@@ -150,9 +171,9 @@ def spacesAndIndent (markerWidth : Nat) (afterMarker : List Char) : Nat × Strin
   let afterStr := String.ofList afterMarker
   if isBlank afterStr then (markerWidth + 1, "")
   else
-    let w := leadingWhitespaceWidth afterStr
-    if w ≥ 5 then (markerWidth + 1, dropIndent afterStr 1)
-    else (markerWidth + w, dropIndent afterStr w)
+    let w := leadingWhitespaceWidthFrom markerWidth afterMarker
+    if w ≥ 5 then (markerWidth + 1, String.ofList (dropIndentGo afterMarker markerWidth 1))
+    else (markerWidth + w, String.ofList (dropIndentGo afterMarker markerWidth w))
 
 def matchListMarker (line : String) : Option (ListType × Nat × String) :=
   let indentW := leadingWhitespaceWidth line
@@ -291,42 +312,70 @@ def matchHtmlBlockStart (line : String) (canInterruptParagraph : Bool) : Option 
           | none => none
     | _ => none
 
-def matchLinkRefDef (line : String) : Option (String × String × Option String) :=
-  let w := leadingWhitespaceWidth line
-  if w ≥ 4 then none
-  else
-    match (dropIndent line w).toList with
-    | '[' :: cs =>
-      let label := cs.takeWhile (· ≠ ']')
-      let afterLabel := cs.drop label.length
-      match afterLabel with
-      | ']' :: ':' :: cs2 =>
-        let cs3 := cs2.dropWhile (fun c => c == ' ' || c == '\t')
-        let (destChars, cs3b) :=
-          match cs3 with
-          | '<' :: csA =>
-            let d := csA.takeWhile (· ≠ '>')
-            (d, csA.drop (d.length + 1))
-          | _ =>
-            let d := cs3.takeWhile (fun c => c ≠ ' ' && c ≠ '\t')
-            (d, cs3.drop d.length)
-        if destChars.isEmpty || label.isEmpty then none
-        else
-          let afterDest := cs3b.dropWhile (fun c => c == ' ' || c == '\t')
-          match afterDest with
-          | [] => some (String.ofList label, String.ofList destChars, none)
-          | '"' :: cs4 =>
-            let title := cs4.takeWhile (· ≠ '"')
-            let afterTitle := cs4.drop title.length
-            match afterTitle with
-            | '"' :: rest5 =>
-              if rest5.all (fun c => c == ' ' || c == '\t') then
-                some (String.ofList label, String.ofList destChars, some (String.ofList title))
-              else none
-            | _ => none
-          | _ => none
-      | _ => none
-    | _ => none
+-- `some rest` when nothing but spaces/tabs remain before the next line ending (or the end
+-- of input); `rest` starts at the following line. `none` means something else follows.
+def endOfLineAfterWs (chars : List Char) : Option (List Char) :=
+  match chars.dropWhile (fun c => c == ' ' || c == '\t') with
+  | [] => some []
+  | '\n' :: rest => some rest
+  | _ => none
+
+-- A link reference definition is only ever recognized as a (possibly multi-line) prefix of
+-- what would otherwise be paragraph text, stripped off when that paragraph's accumulated
+-- lines are closed; see `State.closeLeaf`. Since paragraph accumulation already stops at any
+-- blank line, `chars` can never contain two consecutive newlines, so skipping whitespace
+-- freely (including newlines) between components can never accidentally cross a blank line.
+def tryParseOneLinkRefDef (chars : List Char) :
+    Option ((String × String × Option String) × List Char) :=
+  match chars with
+  | '[' :: rest =>
+    match takeLabelChars rest with
+    | none => none
+    | some (labelRaw, afterLabel) =>
+      if labelRaw.isEmpty || labelRaw.length > 999 || labelRaw.all isUnicodeWhitespace then none
+      else
+        match afterLabel with
+        | ':' :: afterColon =>
+          let afterWs1 := afterColon.dropWhile isUnicodeWhitespace
+          let isAngle := afterWs1.head? == some '<'
+          match parseLinkDest afterWs1 with
+          | none => none
+          | some (destChars, afterDest) =>
+            if destChars.isEmpty && !isAngle then none
+            else
+              let label := String.ofList labelRaw
+              let dest := resolveEscapesAndEntities (String.ofList destChars)
+              let afterWs2 := afterDest.dropWhile isUnicodeWhitespace
+              let hadWs := afterWs2.length < afterDest.length
+              let withTitle : Option ((String × Option String) × List Char) :=
+                match if hadWs then parseTitle afterWs2 else none with
+                | some (titleChars, afterTitle) =>
+                  match endOfLineAfterWs afterTitle with
+                  | some rem =>
+                    some ((dest, some (resolveEscapesAndEntities (String.ofList titleChars))), rem)
+                  | none => none
+                | none => none
+              match withTitle with
+              | some ((d, t), rem) => some ((label, d, t), rem)
+              | none =>
+                match endOfLineAfterWs afterDest with
+                | some rem => some ((label, dest, none), rem)
+                | none => none
+        | _ => none
+  | _ => none
+
+def stripLinkRefDefsF :
+    Nat → List Char → List (String × String × Option String) × List Char
+  | 0, chars => ([], chars)
+  | fuel + 1, chars =>
+    match tryParseOneLinkRefDef chars with
+    | some (linkDef, rest) =>
+      let (more, finalRest) := stripLinkRefDefsF fuel rest
+      (linkDef :: more, finalRest)
+    | none => ([], chars)
+
+def stripLinkRefDefs (chars : List Char) : List (String × String × Option String) × List Char :=
+  stripLinkRefDefsF (chars.length + 1) chars
 
 -- `strictListInterrupt` applies the "ordered lists can only interrupt a paragraph if they
 -- start at 1" rule. That rule exists to stop plain text like "2. bar" from accidentally
@@ -342,7 +391,7 @@ def startsNewBlock (strictListInterrupt : Bool) (remainder : String) : Bool :=
   || (matchBlockQuoteStart remainder).isSome
   || (match matchListMarker remainder with
       | some (kind, _, afterMarker) =>
-        !isBlank afterMarker && (!strictListInterrupt || listMarkerCanInterrupt kind afterMarker)
+        !strictListInterrupt || (!isBlank afterMarker && listMarkerCanInterrupt kind afterMarker)
       | none => false)
 
 inductive RawBlock where
@@ -414,10 +463,18 @@ def finalizeLeaf : OpenLeaf → Option RawBlock
   | .html _ lines =>
     some (.htmlBlock (String.intercalate "\n" lines.toList ++ "\n"))
 
+-- Link reference definitions are only recognized as a (possibly multi-line) prefix of what
+-- would otherwise be a paragraph, so they're stripped off here rather than in `finalizeLeaf`.
 def State.closeLeaf (st : State) : State :=
-  match finalizeLeaf st.leaf with
-  | some b => (st.pushBlock b).setLeafEmpty
-  | none => st.setLeafEmpty
+  match st.leaf with
+  | .paragraph lines =>
+    let (defs, remChars) := stripLinkRefDefs (String.intercalate "\n" lines.toList).toList
+    let st1 := { st with linkDefs := defs.foldl (fun acc d => acc.push d) st.linkDefs }
+    (if remChars.isEmpty then st1 else st1.pushBlock (.paragraph (String.ofList remChars))).setLeafEmpty
+  | leaf =>
+    match finalizeLeaf leaf with
+    | some b => (st.pushBlock b).setLeafEmpty
+    | none => st.setLeafEmpty
 
 def frameToRawBlock (f : Frame) : RawBlock :=
   match f.container with
@@ -433,11 +490,24 @@ def State.closeFramesTo (st : State) (target : Nat) : State × Option (ListType 
       | none => pure ()
       | some f =>
         let rest := s.frames.pop
+        -- A blank line only counts as a separator (towards the next sibling, or towards
+        -- whatever follows in the enclosing container) if it followed actual content; an
+        -- item whose very first line is blank (a bare marker like "-") isn't itself one.
+        let trailingBlank := f.pendingBlank && !f.siblings.isEmpty
         if firstResult.isNone then
           match f.container with
-          | .item kind _ => firstResult := some (kind, f.pendingBlank)
+          | .item kind _ => firstResult := some (kind, trailingBlank)
           | .blockQuote => pure ()
-        s := { s with frames := rest }
+        -- If the parent frame is itself about to close in this same call (i.e. it's not
+        -- staying open at `target`), it's not going to receive any further content that a
+        -- trailing blank here could separate, so the flag isn't propagated to it.
+        let rest' :=
+          if trailingBlank && rest.size == target then
+            match rest.back? with
+            | some pf => rest.pop.push { pf with pendingBlank := true }
+            | none => rest
+          else rest
+        s := { s with frames := rest' }
         s := s.pushBlock (frameToRawBlock f)
     return (s, firstResult)
 
@@ -518,9 +588,7 @@ def startBlockFrom (st : State) (remainder : String) (carry : Option (ListType �
           if leadingWhitespaceWidth remainder2 ≥ 4 then
             { st1 with leaf := .indentedCode #[dropIndent remainder2 4] }
           else
-            match matchLinkRefDef remainder2 with
-            | some (label, dest, title) => { st1 with linkDefs := st1.linkDefs.push (label, dest, title) }
-            | none => { st1 with leaf := .paragraph #[stripUpTo3 remainder2] }
+            { st1 with leaf := .paragraph #[stripUpTo3 remainder2] }
 
 def processLine (st : State) (line : String) : State :=
   let (m, remainder) := matchContainers st.frames line
@@ -552,14 +620,34 @@ def processLine (st : State) (line : String) : State :=
       else
         match matchSetextUnderline remainder with
         | some level =>
-          let text := String.intercalate "\n" lines.toList
-          ({ st with leaf := .empty }).pushBlock (.heading level text)
+          -- Any link reference definitions at the front of the buffered paragraph text
+          -- are stripped first; if nothing but definitions remain, there's no paragraph
+          -- left to convert, so the underline line is instead processed as a fresh line.
+          let (defs, remChars) := stripLinkRefDefs (String.intercalate "\n" lines.toList).toList
+          let st1 := { st with linkDefs := defs.foldl (fun acc d => acc.push d) st.linkDefs }
+          if remChars.isEmpty then
+            startBlockFrom { st1 with leaf := .empty } remainder none
+          else
+            ({ st1 with leaf := .empty }).pushBlock (.heading level (String.ofList remChars))
         | none =>
           if startsNewBlock true remainder then
             startBlockFrom st.closeLeaf remainder none
           else
             st.appendParagraphLine (stripLeadingWs remainder)
-    | .empty => startBlockFrom st remainder none
+    | .empty =>
+      -- A list item can begin with at most one blank line: a second consecutive blank line
+      -- while the innermost item still has no content ends that item as empty right away,
+      -- rather than letting a later indented line join it.
+      match st.frames.back? with
+      | some f =>
+        let isItem := match f.container with | .item _ _ => true | .blockQuote => false
+        if isBlank remainder && isItem && f.siblings.isEmpty && f.pendingBlank then
+          let st1 := { st with frames := st.frames.pop.push { f with loose := true } }
+          let (st2, _) := st1.closeFramesTo (st1.frames.size - 1)
+          st2.markPendingBlank
+        else
+          startBlockFrom st remainder none
+      | none => startBlockFrom st remainder none
   else
     match st.leaf with
     | .paragraph _ =>

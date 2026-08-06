@@ -14,9 +14,46 @@ private def escapeChar (c : Char) : String :=
 private def escapeText (s : String) : String :=
   s.foldl (init := "") fun acc c => acc ++ escapeChar c
 
--- Href/src attribute values get the same HTML-attribute escaping as text; full URI
--- percent-encoding (as cmark does) is not yet implemented.
-private def escapeUri (s : String) : String := escapeText s
+private def toHexDigit (n : Nat) : Char :=
+  if n < 10 then Char.ofNat (n + '0'.toNat) else Char.ofNat (n - 10 + 'A'.toNat)
+
+private def byteToPercent (b : Nat) : String :=
+  "%" ++ (toHexDigit (b / 16)).toString ++ (toHexDigit (b % 16)).toString
+
+-- The UTF-8 encoding of a Unicode scalar value, one byte per list element.
+private def utf8Bytes (c : Char) : List Nat :=
+  let cp := c.toNat
+  if cp ≤ 0x7F then [cp]
+  else if cp ≤ 0x7FF then [0xC0 ||| (cp >>> 6), 0x80 ||| (cp &&& 0x3F)]
+  else if cp ≤ 0xFFFF then
+    [0xE0 ||| (cp >>> 12), 0x80 ||| ((cp >>> 6) &&& 0x3F), 0x80 ||| (cp &&& 0x3F)]
+  else
+    [0xF0 ||| (cp >>> 18), 0x80 ||| ((cp >>> 12) &&& 0x3F),
+     0x80 ||| ((cp >>> 6) &&& 0x3F), 0x80 ||| (cp &&& 0x3F)]
+
+private def isHexDigitChar (c : Char) : Bool := c.isDigit || ('a' ≤ c.toLower && c.toLower ≤ 'f')
+
+private def isUriSafeChar (c : Char) : Bool :=
+  c.isAlphanum || "-_.!~*'();/?:@&=+$,#".toList.contains c
+
+-- Matches the reference renderers' href/src encoding: percent-encode everything outside a
+-- fixed safe set, but leave an existing well-formed %XX escape alone rather than
+-- double-encoding it.
+private def percentEncodeUriF : Nat → List Char → String
+  | 0, _ => ""
+  | _ + 1, [] => ""
+  | fuel + 1, '%' :: h1 :: h2 :: rest =>
+    if isHexDigitChar h1 && isHexDigitChar h2 then
+      "%" ++ h1.toString ++ h2.toString ++ percentEncodeUriF fuel rest
+    else "%25" ++ percentEncodeUriF fuel (h1 :: h2 :: rest)
+  | fuel + 1, c :: rest =>
+    if isUriSafeChar c then c.toString ++ percentEncodeUriF fuel rest
+    else (utf8Bytes c).foldl (fun acc b => acc ++ byteToPercent b) "" ++ percentEncodeUriF fuel rest
+
+-- Percent-encoding leaves characters like `&` untouched (they're valid in a URI), so the
+-- result still needs the usual HTML-attribute escaping on top.
+private def escapeUri (s : String) : String :=
+  escapeText (percentEncodeUriF (s.length + 1) s.toList)
 
 mutual
 private def renderInline (i : Inline) : String :=

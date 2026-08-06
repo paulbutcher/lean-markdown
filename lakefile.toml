@@ -11,6 +11,11 @@ rev = "v4.32.0"
 [[lean_lib]]
 name = "CommonMark"
 
+[[lean_lib]]
+name = "TestData"
+srcDir = "test"
+globs = ["SpecExamples", "Conformance"]
+
 [[lean_exe]]
 name = "test"
 srcDir = "test"
