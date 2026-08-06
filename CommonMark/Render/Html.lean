@@ -4,7 +4,12 @@ import CommonMark.Ast
 
 namespace CommonMark
 
-private def escapeChar (c : Char) : String :=
+-- Kept public, unlike most of this file's other helpers: any code producing HTML from
+-- Markdown-derived text, including a Markdown-extension renderer built on top of this
+-- library, needs the exact same escaping (and gets to reuse the safety proofs below
+-- instead of re-deriving them).
+
+def escapeChar (c : Char) : String :=
   match c with
   | '&' => "&amp;"
   | '<' => "&lt;"
@@ -12,7 +17,7 @@ private def escapeChar (c : Char) : String :=
   | '"' => "&quot;"
   | _ => c.toString
 
-private def escapeText (s : String) : String :=
+def escapeText (s : String) : String :=
   s.foldl (init := "") fun acc c => acc ++ escapeChar c
 
 -- Escaping-safety: `escapeChar`/`escapeText` never let a `<`, `>`, or `"` through raw, no
@@ -20,7 +25,7 @@ private def escapeText (s : String) : String :=
 -- and text node the renderer produces from AST leaf content (see the summary at the end
 -- of this file for how it's composed into the renderer's overall safety argument).
 
-private theorem escapeChar_safe (c : Char) :
+theorem escapeChar_safe (c : Char) :
     ∀ d ∈ (escapeChar c).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' := by
   unfold escapeChar
   split <;> first
@@ -35,7 +40,7 @@ private theorem escapeChar_safe (c : Char) :
 -- and the starting accumulator is safe, so is the whole fold, regardless of what `g` is.
 -- Kept independent of `Inline`/`Char` specifics (and of the `escapeChar`/`plainTextOf`
 -- mutual-recursion groups) so it can be reused without disturbing their termination proofs.
-private theorem foldl_append_safe {α : Type} (g : α → String) (l : List α) (acc : String)
+theorem foldl_append_safe {α : Type} (g : α → String) (l : List α) (acc : String)
     (hacc : ∀ d ∈ acc.toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"')
     (hg : ∀ x d, d ∈ (g x).toList → d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"') :
     ∀ d ∈ (l.foldl (fun acc x => acc ++ g x) acc).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' := by
@@ -54,7 +59,7 @@ private theorem foldl_append_safe {α : Type} (g : α → String) (l : List α) 
 -- Lean's termination checker already accepts for `plainTextOf`/`plainTextOfInlines`
 -- themselves, rather than routing through an accumulator-generalized helper (whose extra
 -- parameter the checker can't line up against the other mutual member's single argument).
-private theorem foldl_append_eq {α : Type} (g : α → String) (l : List α) (c : String) :
+theorem foldl_append_eq {α : Type} (g : α → String) (l : List α) (c : String) :
     l.foldl (fun acc x => acc ++ g x) c = c ++ l.foldl (fun acc x => acc ++ g x) "" := by
   induction l generalizing c with
   | nil => simp
@@ -66,7 +71,7 @@ private theorem foldl_append_eq {α : Type} (g : α → String) (l : List α) (c
       _ = c ++ rest.foldl (fun acc y => acc ++ g y) (g x) := by rw [ih (g x)]
       _ = c ++ (x :: rest).foldl (fun acc y => acc ++ g y) "" := rfl
 
-private theorem escapeText_safe (s : String) :
+theorem escapeText_safe (s : String) :
     ∀ d ∈ (escapeText s).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' := by
   unfold escapeText
   rw [String.foldl_eq_foldl_toList]
@@ -110,17 +115,20 @@ private def percentEncodeUriF : Nat → List Char → String
 
 -- Percent-encoding leaves characters like `&` untouched (they're valid in a URI), so the
 -- result still needs the usual HTML-attribute escaping on top.
-private def escapeUri (s : String) : String :=
+def escapeUri (s : String) : String :=
   escapeText (percentEncodeUriF (s.length + 1) s.toList)
 
 -- `escapeUri` is `escapeText` applied to whatever `percentEncodeUriF` produces, so its
 -- safety follows regardless of what that intermediate string looks like.
-private theorem escapeUri_safe (s : String) :
+theorem escapeUri_safe (s : String) :
     ∀ d ∈ (escapeUri s).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' :=
   escapeText_safe _
 
+-- Public alongside `escapeChar`/`escapeText`/`escapeUri`, for the same reason: a
+-- Markdown-extension AST that embeds `List Inline` at its leaves (e.g. a table cell's
+-- content) needs to render that embedded content identically to this renderer.
 mutual
-private def renderInline (i : Inline) : String :=
+def renderInline (i : Inline) : String :=
   match i with
   | .text s => escapeText s
   | .code s => "<code>" ++ escapeText s ++ "</code>"
@@ -141,11 +149,11 @@ private def renderInline (i : Inline) : String :=
   | .softBreak => "\n"
   | .lineBreak => "<br />\n"
 
-private def renderInlines (content : List Inline) : String :=
+def renderInlines (content : List Inline) : String :=
   content.foldl (init := "") fun acc i => acc ++ renderInline i
 
 -- Image alt text is the plain-text rendering of the content, with inline markup stripped.
-private def plainTextOf (i : Inline) : String :=
+def plainTextOf (i : Inline) : String :=
   match i with
   | .text s => escapeText s
   | .code s => escapeText s
@@ -157,7 +165,7 @@ private def plainTextOf (i : Inline) : String :=
   | .softBreak => "\n"
   | .lineBreak => "\n"
 
-private def plainTextOfInlines (content : List Inline) : String :=
+def plainTextOfInlines (content : List Inline) : String :=
   content.foldl (init := "") fun acc i => acc ++ plainTextOf i
 end
 
@@ -165,7 +173,7 @@ end
 -- still leaf content and needs the same guarantee: dropping into `.htmlInline` returns ""
 -- rather than the raw markup, so alt text built from it can't smuggle a tag through either.
 mutual
-private theorem plainTextOf_safe (i : Inline) :
+theorem plainTextOf_safe (i : Inline) :
     ∀ d ∈ (plainTextOf i).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' := by
   match i with
   | .text s => simp only [plainTextOf]; exact escapeText_safe s
@@ -178,7 +186,7 @@ private theorem plainTextOf_safe (i : Inline) :
   | .softBreak => simp [plainTextOf]
   | .lineBreak => simp [plainTextOf]
 
-private theorem plainTextOfInlines_safe (content : List Inline) :
+theorem plainTextOfInlines_safe (content : List Inline) :
     ∀ d ∈ (plainTextOfInlines content).toList, d ≠ '<' ∧ d ≠ '>' ∧ d ≠ '"' := by
   match content with
   | [] => simp [plainTextOfInlines]
@@ -245,7 +253,11 @@ private def renderBlocksF (tight : Bool) : Nat → List Block → String
     else bStr ++ restStr
 end
 
-private def renderBlocks (tight : Bool) (blocks : List Block) : String :=
+-- Public for the same reason as the inline renderers above: an extension whose own block
+-- kinds contain ordinary `Block` content (e.g. a table cell containing a nested list)
+-- needs to render it the same way `renderHtml` does. `tight` selects loose- vs.
+-- tight-list-style paragraph wrapping, matching the meaning of `Block.list`'s own field.
+def renderBlocks (tight : Bool) (blocks : List Block) : String :=
   renderBlocksF tight (Block.listCount blocks + 1) blocks
 
 /-- Renders a `Document` to HTML per the spec's exact escaping and formatting rules.
