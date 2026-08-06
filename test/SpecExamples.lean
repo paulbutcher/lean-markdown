@@ -1,4 +1,5 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 -- The official CommonMark 0.31.2 example suite, generated from test/vendor/spec.json
 -- (see that file for source and license); used both as the runtime acceptance test in
 -- test/Main.lean and as the data for the conformance theorem in test/Conformance.lean.

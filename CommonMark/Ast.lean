@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 namespace CommonMark
 
+/-- Inline-level content: the children of a paragraph, heading, or another inline node.
+    `text`/`code`/`htmlInline`/`softBreak`/`lineBreak` are leaves; the rest carry nested
+    content. -/
 inductive Inline where
   | text       (s : String)
   | code       (s : String)
@@ -13,11 +17,17 @@ inductive Inline where
   | lineBreak
   deriving Repr, BEq
 
+/-- A list's marker style: `bullet` for `-`/`*`/`+` lists, `ordered` for `1.`/`1)` lists
+    starting from `start`. -/
 inductive ListType where
   | bullet (marker : Char)
   | ordered (start : Nat) (delimiter : Char)
   deriving Repr, BEq
 
+/-- Block-level content: the top-level elements of a `Document`, or the children of a
+    block quote or list item. `heading`'s `level` is zero-indexed (`0` is `h1`, `5` is
+    `h6`). `list`'s `tight`/`items` follow the spec's tight/loose distinction: a tight
+    list renders its items' paragraphs without wrapping `<p>` tags. -/
 inductive Block where
   | paragraph  (content : List Inline)
   | heading    (level : Fin 6) (content : List Inline)
@@ -28,6 +38,7 @@ inductive Block where
   | htmlBlock  (s : String)
   deriving Repr, BEq
 
+/-- A parsed CommonMark document: an ordered list of top-level blocks. -/
 abbrev Document := List Block
 
 -- Total node count, used to size fuel for the recursions below (and reused by the
@@ -104,6 +115,7 @@ def Block.map (fi : Inline → Inline) (fb : Block → Block) (b : Block) : Bloc
 def Document.map (fi : Inline → Inline) (fb : Block → Block) (doc : Document) : Document :=
   Block.mapListF fi fb (Block.listCount doc) doc
 
+/-- `Block.map` with no block-level rewrite, for callers that only touch inline content. -/
 def Block.mapInline (f : Inline → Inline) (b : Block) : Block := Block.map f id b
 def Document.mapInline (f : Inline → Inline) (doc : Document) : Document := Document.map f id doc
 

@@ -1,4 +1,5 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 import CommonMark.Ast
 
 namespace CommonMark
@@ -247,6 +248,9 @@ end
 private def renderBlocks (tight : Bool) (blocks : List Block) : String :=
   renderBlocksF tight (Block.listCount blocks + 1) blocks
 
+/-- Renders a `Document` to HTML per the spec's exact escaping and formatting rules.
+    No AST leaf's string content can produce unescaped `<`, `>`, `&`, or unescaped `"`
+    inside an attribute in the output; see this file's `*_safe` theorems for the proof. -/
 def renderHtml (doc : Document) : String :=
   renderBlocks false doc
 

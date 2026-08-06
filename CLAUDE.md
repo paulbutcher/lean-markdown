@@ -36,6 +36,7 @@ Read it before changing the schema or migrations, and keep it up to date when th
   project understand Lean and don't need it explaining to them.
 - All files should start with a copyright statement containing:
   Copyright (c) 2026 Paul Butcher. All rights reserved.
+  Released under Apache 2.0 license as described in the file LICENSE.
 - Never use an emdash (—). Wherever you might use one, use either a comma or a
   semicolon instead.
   

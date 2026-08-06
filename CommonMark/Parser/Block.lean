@@ -1,4 +1,5 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 import CommonMark.Ast
 import CommonMark.Parser.Inline
 
@@ -747,6 +748,10 @@ end CommonMark.Parser
 
 namespace CommonMark
 
+/-- Parses a CommonMark document into an AST. Total: every input string, including
+    malformed or adversarial input, produces a `Document` rather than panicking or
+    looping. Matches the official example suite exactly (see
+    `test/Conformance.lean`'s `commonmark_conformance` theorem). -/
 def parseDocument (s : String) : Document :=
   let (blocks, defs) := Parser.finalizeState (Parser.runLines (Parser.splitLines s))
   Parser.groupAndConvert defs blocks

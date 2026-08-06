@@ -1,4 +1,5 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 import CommonMark.Ast
 
 -- Document/Block/Inline is not a single homogeneous rose tree (Block has three different
@@ -47,6 +48,7 @@ inductive InlineCtx where
   | image  (dest : String) (title : Option String) (left right : List Inline) (up : InlineCtx)
   deriving Repr, BEq
 
+/-- An inline-focused cursor, the `Inline` counterpart to `BlockZipper`. -/
 structure InlineZipper where
   focus : Inline
   leftSiblings : List Inline

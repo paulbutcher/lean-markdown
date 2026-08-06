@@ -189,7 +189,9 @@ Follow the source project's general testing rules, since they're good defaults h
 
 ## 8. Coding conventions
 
-- All files start with: `Copyright (c) 2026 Paul Butcher. All rights reserved.`
+- All files start with:
+  `Copyright (c) 2026 Paul Butcher. All rights reserved.`
+  `Released under Apache 2.0 license as described in the file LICENSE.`
 - No `partial` functions unless truly unavoidable — if you hit a case that seems to need
   one, stop and reconsider the recursion structure first.
 - Comments only where they explain *why*, never restating what the code already says;
