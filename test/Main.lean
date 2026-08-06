@@ -31,11 +31,21 @@ def checkExample (ex : SpecExample) : IO Bool := do
     IO.eprintln s!"example {ex.example_} ({ex.section_}) failed\nexpected: {ex.html}\nactual:   {actual}"
     pure false
 
+-- Covers the block-structure constructs implemented so far without needing inline parsing
+-- (emphasis, links, entities, ...), which is still Phase 3 work; the full suite becomes the
+-- acceptance test in Phase 5.
+def blockRegressionExamples : List Nat :=
+  [43, 62, 83, 107, 119, 228, 231, 269, 650]
+
 def main : IO Unit := do
   let examples ← loadSpecExamples "test/vendor/spec.json"
-  let some ex650 := examples.find? (·.example_ == 650)
-    | throw (IO.userError "example 650 not found in spec.json")
-  if ← checkExample ex650 then
-    IO.println s!"spec example 650 ({ex650.section_}) passed end-to-end"
-  else
-    IO.Process.exit 1
+  let mut allPassed := true
+  for n in blockRegressionExamples do
+    match examples.find? (·.example_ == n) with
+    | none => throw (IO.userError s!"example {n} not found in spec.json")
+    | some ex =>
+      if ← checkExample ex then
+        IO.println s!"spec example {n} ({ex.section_}) passed"
+      else
+        allPassed := false
+  if !allPassed then IO.Process.exit 1

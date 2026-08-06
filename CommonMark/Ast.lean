@@ -5,8 +5,19 @@ inductive Inline where
   | text (s : String)
   deriving Repr, BEq
 
+inductive ListType where
+  | bullet (marker : Char)
+  | ordered (start : Nat) (delimiter : Char)
+  deriving Repr, BEq
+
 inductive Block where
-  | paragraph (content : List Inline)
+  | paragraph  (content : List Inline)
+  | heading    (level : Fin 6) (content : List Inline)
+  | codeBlock  (info : Option String) (literal : String)
+  | blockQuote (content : List Block)
+  | list       (kind : ListType) (tight : Bool) (items : List (List Block))
+  | thematicBreak
+  | htmlBlock  (s : String)
   deriving Repr, BEq
 
 abbrev Document := List Block
