@@ -97,17 +97,6 @@ private def plainTextOfInlines (content : List Inline) : String :=
   content.foldl (init := "") fun acc i => acc ++ plainTextOf i
 end
 
-mutual
-private def blockCount : Block → Nat
-  | .blockQuote content => 1 + blockListCount content
-  | .list _ _ items => 1 + items.foldl (fun acc c => acc + blockListCount c) 0
-  | _ => 1
-
-private def blockListCount : List Block → Nat
-  | [] => 0
-  | b :: rest => 1 + blockCount b + blockListCount rest
-end
-
 -- Recursion is driven by an explicit fuel value (bounded by the total block count) rather
 -- than structural recursion on Block/List Block, since the doubly-nested `list` items make
 -- that relationship opaque to the termination checker; see the analogous parser code.
@@ -160,7 +149,7 @@ private def renderBlocksF (tight : Bool) : Nat → List Block → String
 end
 
 private def renderBlocks (tight : Bool) (blocks : List Block) : String :=
-  renderBlocksF tight (blockListCount blocks + 1) blocks
+  renderBlocksF tight (Block.listCount blocks + 1) blocks
 
 def renderHtml (doc : Document) : String :=
   renderBlocks false doc
