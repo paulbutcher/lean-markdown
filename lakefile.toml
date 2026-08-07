@@ -1,7 +1,7 @@
 name = "commonmark"
 version = "0.1.0"
 defaultTargets = ["CommonMark"]
-testDriver = "test"
+testDriver = "TestData"
 
 [[require]]
 name = "plausible"
@@ -19,9 +19,4 @@ name = "CommonMark"
 [[lean_lib]]
 name = "TestData"
 srcDir = "test"
-globs = ["SpecExamples", "Conformance", "ZipperLaws", "ParserLaws", "HtmlWellFormedness"]
-
-[[lean_exe]]
-name = "test"
-srcDir = "test"
-root = "Main"
+globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness"]
