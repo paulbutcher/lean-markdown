@@ -4,24 +4,28 @@ import GFMarkdown.Ast
 
 namespace GFMarkdown.Parser
 
-open CommonMark.Parser (RawBlock LinkDefs parseInline takeSameKindItems rawBlockListCount
-  rawBlockToBlockF)
+open CommonMark.Parser (RawBlock LinkDefs parseInlineRaw takeSameKindItems rawBlockListCount
+  headingLevelToFin)
 
 -- Mirrors `CommonMark.Parser.rawBlockToBlockF`/`groupAndConvertF`'s mutual, fuel-bounded
--- recursion (see the comment there for why fuel is needed instead of structural recursion),
--- but recurses into `GFMarkdown.Block` for `blockQuote`/`listItem` rather than delegating to
--- the plain conversion, so a table nested inside either is still recognized as one.
+-- recursion (see the comment there for why fuel is needed instead of structural recursion).
+-- Fully independent from that conversion now (Phase 1 delegated the non-recursive cases to
+-- it), rather than a partial mirror: once `paragraph`/`heading` need `RawInline`-typed
+-- content of their own (to carry a `strikethrough`, which `CommonMark.Inline` never does),
+-- there's nothing left to usefully delegate.
 mutual
 def rawBlockToBlockGfmF (defs : LinkDefs) : Nat → RawBlock → GFMarkdown.Block
-  | 0, _ => .commonmark (.paragraph [])
+  | 0, _ => .paragraph []
+  | _ + 1, .paragraph text => .paragraph (parseInlineRaw true defs text)
+  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInlineRaw true defs text)
+  | _ + 1, .codeBlock info lit => .codeBlock info lit
+  | _ + 1, .thematicBreak => .thematicBreak
+  | _ + 1, .htmlBlock s => .htmlBlock s
   | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertGfmF defs fuel content)
   | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertGfmF defs fuel content]
   | _ + 1, .table header alignments rows =>
-    .table (header.map (parseInline defs)) alignments (rows.map (List.map (parseInline defs)))
-  -- Every remaining `RawBlock` constructor (paragraph/heading/codeBlock/thematicBreak/
-  -- htmlBlock) has no nested-block content, so fuel can't matter to it; delegating to the
-  -- plain single-node conversion with fuel `1` avoids restating its logic here.
-  | _ + 1, b => .commonmark (rawBlockToBlockF defs 1 b)
+    .table (header.map (parseInlineRaw true defs)) alignments
+      (rows.map (List.map (parseInlineRaw true defs)))
 
 def groupAndConvertGfmF (defs : LinkDefs) : Nat → List RawBlock → List GFMarkdown.Block
   | 0, _ => []

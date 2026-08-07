@@ -42,20 +42,19 @@ spec, `GFM/` for cmark-gfm's extension suites.
   https://github.com/github/cmark-gfm/blob/0.29.0.gfm.13/test/smart_punct.txt).
   Same fence convention, no front matter; `extract_spec.pl` works on both
   unmodified.
-- `test/GfmTableGuards.lean` is generated from `extensions.json`, filtered to
-  examples 1-16 (every "Tables"/"Table cell count mismatches"/"Embedded
-  pipes"/"Oddly-formatted markers"/"Escaping"/"Embedded HTML"/
-  "Reference-style links"/"Sequential cells"/"Interaction with emphasis"/"a
-  table can be recognised..." example -- the sections Phase 2 implements),
-  via `scripts/generate_guards.pl`'s optional checker/import arguments:
+- `test/GfmGuards.lean` is generated from `extensions.json`, filtered to whichever example
+  range covers the sections implemented so far (currently 1-18: Tables through
+  Strikethroughs), via `scripts/generate_guards.pl`'s optional checker/import arguments.
+  Re-run and widen the range as later phases land:
   ```
-  jq '[.[] | select(.example >= 1 and .example <= 16)]' test/vendor/GFM/extensions.json \
-    | scripts/generate_guards.pl /dev/stdin checkExampleGfm CheckExampleGfm > test/GfmTableGuards.lean
+  jq '[.[] | select(.example >= 1 and .example <= 18)]' test/vendor/GFM/extensions.json \
+    | scripts/generate_guards.pl /dev/stdin checkExampleGfm CheckExampleGfm > test/GfmGuards.lean
   ```
-  The remaining examples (17-30: strikethrough, autolinks, HTML tag filter,
-  footnotes, task lists) aren't implemented yet; wiring all of `extensions.txt`
-  (and `regression.txt`/`smart_punct.txt`) into one generated suite, expecting
-  many failures until later phases land, is `GFM_PLAN.md` Phase 6.
+  The remaining examples (19-30: autolinks, HTML tag filter, footnotes, task lists) aren't
+  implemented yet; wiring all of `extensions.txt` (and `regression.txt`/`smart_punct.txt`)
+  into one generated suite, expecting many failures until later phases land, is `GFM_PLAN.md`
+  Phase 6 -- at which point this file's incremental-range approach is superseded by that
+  fuller suite.
 
 ## License
 
