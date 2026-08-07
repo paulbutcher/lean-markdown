@@ -74,34 +74,64 @@ that's achievable without disproportionate cost.
   `#`-heading patterns. Extraction verified against all three (30/26/16 examples
   respectively); not yet wired into generated guard files (Phase 6).
 
-## Phase 1 — Raw/narrow split for blocks (enables tables)
+## Phase 1 — Raw/narrow split for blocks (enables tables) — **Done**
 
-- `RawBlock` (`CommonMark/Parser/Block.lean:398-405`) is already internal to
-  `Parser/Block.lean` — nothing outside that file matches over it. Add
-  `RawBlock.table (header rows : ...)` there; this doesn't touch any exhaustive match
-  anywhere else in the library, since it isn't part of it yet.
-- Thread a `gfmTables : Bool` parameter through `startsNewBlock`, `processLine`,
-  `runLines`, defaulting to `false` at `parseDocument`'s existing call sites (behavior
-  provably unchanged there — the new disjunct in `startsNewBlock`'s cascade is `gfmTables
-  && ...`, so with `gfmTables = false` it reduces to exactly today's expression).
-- Add a `GFMarkdown.Block` type:
-  `.commonmark (b : CommonMark.Block) | .table (...)`. `CommonMark.Parser.groupAndConvert`'s
-  existing job (`RawBlock → CommonMark.Block`, `CommonMark/Parser/Block.lean:744-745`)
-  gets a sibling `groupAndConvertGfm : LinkDefs → List RawBlock → List GFMarkdown.Block`
-  that maps `.table` `RawBlock`s to `GFMarkdown.Block.table` and delegates everything
-  else to the existing conversion, wrapped in `.commonmark`.
-- Table cell content: keep raw `String` in `RawBlock.table`, consistent with how
+- `RawBlock` (`CommonMark/Parser/Block.lean`) is already internal to `Parser/Block.lean` —
+  nothing outside that file matches over it. Added `RawBlock.table (header : List String)
+  (alignments : List TableAlignment) (rows : List (List String))`, plus the `TableAlignment`
+  enum (`left`/`right`/`center`/`unset`) it needs. `rawBlockToBlockF`'s match over `RawBlock`
+  lives in this same file, though, and *is* exhaustive over the type — adding a constructor
+  there meant giving it a `.table` arm too. Since nothing produces `RawBlock.table` until
+  `gfmTables` exists (Phase 2), that arm is presently unreachable dead code from the plain
+  path's perspective; it returns `.paragraph []`, the same kind of total-but-unreachable
+  fallback the file's fuel-exhaustion case (`| 0, _ => .paragraph []`) already uses. Phase 3
+  formalizes the unreachability; until then it's an informal invariant, same as elsewhere in
+  this file.
+- Table cell content: kept raw `String` in `RawBlock.table`, consistent with how
   `RawBlock.paragraph` defers inline parsing to the block→`Block` conversion step, rather
   than inline-parsing cells early.
+- **`GFMarkdown.Block` design changed from the original sketch.** The plan originally called
+  for a flat `.commonmark (b : CommonMark.Block) | .table (...)` wrapper. That's a
+  correctness bug: `CommonMark.Block.blockQuote`/`.list` hold `List CommonMark.Block`
+  recursively, so once a block quote or list item's content is wrapped in `.commonmark`,
+  there is no way for a table nested inside it to surface as `.table` — it would silently
+  become an empty paragraph instead (cmark-gfm's own `extensions.txt` doesn't test nested
+  tables, so this wouldn't have shown up as a conformance-suite failure, only as silent
+  data loss on real input like a table inside a changelog list item). Decided: `GFMarkdown.Block`
+  gets its own `blockQuote`/`list` constructors (recursing over `List GFMarkdown.Block`), so a
+  table is recognized at any nesting depth. Every other CommonMark block kind (paragraph,
+  heading, codeBlock, thematicBreak, htmlBlock) has no nested-block content, so those are
+  still reused as-is via `commonmark` rather than restated — only the two recursive
+  constructors needed duplicating. Landed in `GFMarkdown/Ast.lean`.
+- `CommonMark.Parser.groupAndConvert`'s existing job (`RawBlock → CommonMark.Block`) gets a
+  sibling `GFMarkdown.Parser.groupAndConvertGfm : LinkDefs → List RawBlock → List
+  GFMarkdown.Block` (`GFMarkdown/Parser.lean`) that mirrors its mutual, fuel-bounded
+  recursion, but recurses into `GFMarkdown.Block` for `blockQuote`/`listItem` instead of
+  delegating to the plain conversion (required for the nested-table fix above); every other
+  `RawBlock` constructor delegates to `CommonMark.Parser.rawBlockToBlockF` (called with
+  fuel `1`, always sufficient since none of those constructors recurse) wrapped in
+  `.commonmark`, avoiding restating `parseInline`/`headingLevelToFin` logic for them.
+- **`gfmTables : Bool` threading deferred to Phase 2, bundled with `matchTableStart`.**
+  Confirmed empirically that Lean's unused-variable linter fires on an unreferenced function
+  parameter (`lake build` warning), so threading `gfmTables` through `startsNewBlock`/
+  `processLine`/`runLines` now, with nothing yet consulting it, isn't viable without
+  violating "no warnings." It has no genuine use until `matchTableStart` exists to be
+  gated by it, so the two land together in Phase 2.
 
 ## Phase 2 — Tables
 
 Implement `matchTableStart` and the row/alignment/header parsing logic in
-`Parser/Block.lean`, gated behind `gfmTables`, producing `RawBlock.table`. Cover the
-spec's paragraph-interruption rule (a table can start where a paragraph would) and
-column-count/alignment-row validation. Render the new `Block.table` case to
-`<table>`/`<thead>`/`<tbody>` via the `Html` library's constructors, matching how
-`Render/Html.lean` already builds output for the base `CommonMark.Block` cases.
+`Parser/Block.lean`, gated behind a `gfmTables : Bool` parameter threaded through
+`startsNewBlock`/`processLine`/`runLines`/`startBlockFrom` (defaulting to `false` at
+`parseDocument`'s existing call sites — behavior there is provably unchanged, since the new
+disjunct in `startsNewBlock`'s cascade is `gfmTables && matchTableStart remainder |>.isSome`,
+which reduces to exactly today's expression when `gfmTables = false`), producing
+`RawBlock.table`. Cover the spec's paragraph-interruption rule (a table can start where a
+paragraph would) and column-count/alignment-row validation. Add a `GFMarkdown.parseDocument`
+entry point that runs the shared state machine with `gfmTables := true` and converts via
+`groupAndConvertGfm`. Render the new `Block.table` case to `<table>`/`<thead>`/`<tbody>` via
+the `Html` library's constructors, matching how `Render/Html.lean` already builds output for
+the base `CommonMark.Block` cases.
 
 ## Phase 2b — Raw/narrow split and implementation for inlines (enables strikethrough)
 

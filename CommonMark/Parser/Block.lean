@@ -395,6 +395,17 @@ def startsNewBlock (strictListInterrupt : Bool) (remainder : String) : Bool :=
         !strictListInterrupt || (!isBlank afterMarker && listMarkerCanInterrupt kind afterMarker)
       | none => false)
 
+/-- A GFM table column's alignment, from its delimiter row (`:--`/`--:`/`:-:`/`--`). Lives
+    alongside `RawBlock` rather than in the `GFMarkdown` namespace because `RawBlock.table`,
+    produced by the block-level state machine shared by both variants, needs it too, and
+    `CommonMark.Parser` can't depend on `GFMarkdown`. -/
+inductive TableAlignment where
+  | left
+  | right
+  | center
+  | unset
+  deriving Repr, BEq
+
 inductive RawBlock where
   | paragraph  (text : String)
   | heading    (level : Nat) (text : String)
@@ -403,6 +414,7 @@ inductive RawBlock where
   | thematicBreak
   | htmlBlock  (text : String)
   | listItem   (kind : ListType) (loose : Bool) (content : List RawBlock)
+  | table      (header : List String) (alignments : List TableAlignment) (rows : List (List String))
 
 inductive Container where
   | blockQuote
@@ -728,6 +740,9 @@ def rawBlockToBlockF (defs : LinkDefs) : Nat → RawBlock → CommonMark.Block
   | _ + 1, .htmlBlock s => .htmlBlock s
   | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF defs fuel content)
   | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF defs fuel content]
+  -- Only ever produced when `gfmTables = true` (Phase 2 onward); on the plain CommonMark
+  -- path this arm is unreachable, but the match still has to be total over all of `RawBlock`.
+  | _ + 1, .table _ _ _ => .paragraph []
 
 def groupAndConvertF (defs : LinkDefs) : Nat → List RawBlock → List CommonMark.Block
   | 0, _ => []
