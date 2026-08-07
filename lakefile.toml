@@ -23,4 +23,5 @@ name = "GFMarkdown"
 name = "TestData"
 srcDir = "test"
 globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
-  "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties"]
+  "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties",
+  "GfmHtmlWellFormedness"]

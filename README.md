@@ -1,16 +1,14 @@
 # lean-markdown
 
-A [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) parser and HTML renderer for
-Lean 4 (the `CommonMark` namespace), with a GitHub Flavored Markdown (GFM) variant
-(`GFMarkdown`) built on top of the same core: tables, strikethrough, task lists,
-extended autolinks, and the raw-HTML tag filter, with footnotes the one extension not
-yet implemented (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)).
+A Markdown parser and HTML renderer for Lean 4. Supports both
+[CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) and 
+[GitHub Flavored Markdown (GFM)](https://github.com/github/cmark-gfm/).
 
 ## Guarantees
 
-The first three guarantees hold for both `CommonMark` and `GFMarkdown`, since
+All four guarantees below hold for both `CommonMark` and `GFMarkdown`, since
 `GFMarkdown` is built directly on `CommonMark`'s parser and shares the same `Html`
-node-construction layer for rendering; the fourth is `CommonMark`-only.
+node-construction layer for rendering.
 
 - **Conformant**: `CommonMark.parseDocument` matches every example in the official
   CommonMark example suite; `GFMarkdown.parseDocument` matches cmark-gfm's own
@@ -23,17 +21,13 @@ node-construction layer for rendering; the fourth is `CommonMark`-only.
   unescaped HTML markup, or break out of an attribute, for the same reason in both
   variants: every rendered node is built through the shared `Html` library's typed
   constructors, never hand-built strings.
-- **Well-formed** (`CommonMark` only): for input with no embedded raw HTML,
-  `CommonMark.renderHtml`'s output is proved well-formed HTML: balanced tags, with no
-  stray `<`/`>` outside of tag delimiters (`renderHtml_wellFormed` in
-  `test/HtmlWellFormedness.lean`). `GFMarkdown.renderHtml` has no equivalent formal
-  proof; its extra node kinds (tables, task-list checkboxes, `<del>`) are checked only
-  by the conformance suite above, the same way the rest of its behavior is.
+- **Well-formed**: for input with no embedded raw HTML, `renderHtml`'s output is
+  proved well-formed HTML: balanced tags, with no stray `<`/`>` outside of tag
+  delimiters (`renderHtml_wellFormed` in `test/HtmlWellFormedness.lean` for
+  `CommonMark`, `test/GfmHtmlWellFormedness.lean` for `GFMarkdown`, the latter also
+  covering tables, task-list checkboxes, and `<del>`).
 
-See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for the handful of places where the
-implementation trades a small amount of spec-letter fidelity, mostly full-Unicode-table
-completeness, for a smaller and more maintainable codebase; none of them affect the
-official example suite.
+See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Usage
 
@@ -54,8 +48,7 @@ renders:
 <p>Some <em>emphasis</em> and a <a href="https://example.com">link</a>.</p>
 ```
 
-For GFM (tables, strikethrough, task lists, extended autolinks, raw-HTML filtering),
-use `GFMarkdown` instead:
+For GFM use `GFMarkdown` instead:
 
 ```lean
 import GFMarkdown
@@ -110,8 +103,6 @@ git = "<repository URL>"
 lake build   # build the library
 lake test    # run the example-suite conformance test and other tests
 ```
-
-See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for known spec-conformance gaps.
 
 ## License
 

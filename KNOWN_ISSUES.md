@@ -1,9 +1,5 @@
 # Known Issues
 
-Places where the implementation passes the full official CommonMark 0.31.2 example
-suite but does not fully match the letter of the spec, because the
-spec examples don't happen to exercise the gap.
-
 Issues #1-4 below are all in `CommonMark/Parser/Inline.lean`'s character-classification
 tables, which `GFMarkdown` reuses directly (it shares the same inline pipeline via
 `RawInline`), so they apply equally to `GFMarkdown.parseDocument`'s output. Issues #5-6
@@ -66,12 +62,11 @@ Exercised by `extensions.json` examples 23-27 and every `regression.txt` example
 (wholly or partly) `footnotes`; both are excluded from the generated guard suites
 (`test/GfmGuards.lean`, `test/GfmRegressionGuards.lean`) rather than left in to fail.
 
-## 6. Extended autolinks have a few accepted simplifications
+## 6. Extended autolinks have a few simplifications
 
 `GFMarkdown/Autolink.lean`'s `http://`/`https://`/`ftp://`/`www.`/email autolinking
 deliberately diverges from cmark-gfm's `extensions/autolink.c` in three small ways, none
-exercised by the vendored example suite (see `GFM_PLAN.md`'s Phase 4 writeup for how
-each was verified safe against it):
+exercised by the vendored example suite:
 
 - `checkDomainGo` skips the source's escaped-character handling inside a domain.
 - `matchScheme` tests directly at each position rather than literally rewinding through
@@ -89,6 +84,5 @@ each was verified safe against it):
 
 ## Notes
 
-- None of the above are exercised by the official example suite.
 - Issues #1-4 would be fixed if Lean had full Unicode character information
   support.

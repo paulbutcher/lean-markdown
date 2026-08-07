@@ -62,7 +62,7 @@ def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.N
 -- is category-polymorphic): `nodes` interspersed with one before each element and a final one
 -- at the end, matching cmark-gfm's own `cr()`-before-each-child rendering convention for
 -- tables.
-private def interleaveNewlines {cat : Html.Category} (nodes : List (Html.Node cat)) :
+def interleaveNewlines {cat : Html.Category} (nodes : List (Html.Node cat)) :
     List (Html.Node cat) :=
   nodes.foldr (fun n acc => ("\n" : Html.Node cat) :: n :: acc) [("\n" : Html.Node cat)]
 
@@ -72,18 +72,18 @@ private def tableCellAlignAttrs : TableAlignment → List (String × String)
   | .center => [("align", "center")]
   | .unset => []
 
-private def tableCellNode (isHeader : Bool) (alignment : TableAlignment)
+def tableCellNode (isHeader : Bool) (alignment : TableAlignment)
     (content : List RawInline) : Html.Node .tableCell :=
   let children : List (Html.Node .flow) :=
     (inlineListNodes content).map (fun (n : Html.Node .phrasing) => (n : Html.Node .flow))
   let attrs := tableCellAlignAttrs alignment
   if isHeader then Html.th children {} attrs else Html.td children {} attrs
 
-private def tableRowNode (isHeader : Bool) (alignments : List TableAlignment)
+def tableRowNode (isHeader : Bool) (alignments : List TableAlignment)
     (cells : List (List RawInline)) : Html.Node .tableRow :=
   Html.tr (interleaveNewlines (List.zipWith (tableCellNode isHeader) alignments cells))
 
-private def tableNode (header : List (List RawInline)) (alignments : List TableAlignment)
+def tableNode (header : List (List RawInline)) (alignments : List TableAlignment)
     (rows : List (List (List RawInline))) : Html.Node .flow :=
   let theadNode := Html.thead (interleaveNewlines [tableRowNode true alignments header])
   let sections : List (Html.Node .tableSection) :=
