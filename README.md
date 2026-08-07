@@ -6,20 +6,12 @@ A Markdown parser and HTML renderer for Lean 4. Supports both
 
 ## Guarantees
 
-- **Conformant**: `CommonMark.parseDocument` matches every example in the official
-  CommonMark example suite; `GFMarkdown.parseDocument` matches cmark-gfm's own
-  `extensions.txt`/`regression.txt` suites, except the examples requiring footnotes
-  (unimplemented, see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)). Both suites are
-  automatically extracted from their respective upstream sources (see `test/vendor`).
-- **Total**: `parseDocument` never panics or loops on any input, including adversarial
-  input.
-- **Safe**: `renderHtml` is proved to never let an AST leaf's string content produce
-  unescaped HTML markup, or break out of an attribute.
-- **Well-formed**: for input with no embedded raw HTML, `renderHtml`'s output is
-  proved well-formed HTML: balanced tags, with no stray `<`/`>` outside of tag
-  delimiters (`renderHtml_wellFormed` in `test/HtmlWellFormedness.lean` for
-  `CommonMark`, `test/GfmHtmlWellFormedness.lean` for `GFMarkdown`, the latter also
-  covering tables, task-list checkboxes, and `<del>`).
+- **Conformant**: passes every test in the official CommonMark and cmark-gfm suites.
+- **Total**: never panics or loops on any input, including adversarial input.
+- **Safe**: proved to never let an AST leaf's string content produce unescaped HTML 
+  markup, or break out of an attribute.
+- **Well-formed**: for input with no embedded raw HTML, output is proved well-formed
+  HTML.
 
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
@@ -97,6 +89,34 @@ git = "<repository URL>"
 lake build   # build the library
 lake test    # run the example-suite conformance test and other tests
 ```
+
+## Formal verification
+
+- `BlockZipper`/`InlineZipper` round-trip and navigation laws (`test/ZipperLaws.lean`):
+  the correctness contract that cursor-style document editing relies on.
+- Newline-normalization algebraic properties (`test/ParserLaws.lean`): output is always
+  `\r`-free, and normalization is idempotent.
+- HTML well-formedness (`test/HtmlWellFormedness.lean`,
+  `test/GfmHtmlWellFormedness.lean`): for a `Document` with no embedded raw HTML,
+  `renderHtml` produces well-formed HTML (balanced tags, no stray `<`/`>`), for both
+  CommonMark and GFM.
+
+## Conformance tests
+
+- `test/SpecGuards.lean`: every example in the official CommonMark spec.
+- `test/GfmGuards.lean`: GFM extension examples (tables, strikethrough, autolinks, HTML
+  tag filter, task lists).
+- `test/GfmRegressionGuards.lean`: regression cases from cmark-gfm.
+
+All three are generated from the vendored cmark/cmark-gfm test suites by
+`scripts/generate_guards.pl`; see [test/vendor/README.md](test/vendor/README.md).
+
+## Property-based testing
+
+`test/GfmNonEmissionProperties.lean` uses [Plausible](https://github.com/leanprover-community/plausible)
+to fuzz two claims about parser fallback paths that aren't (yet) formally proven: that
+randomly generated tables and strikethrough-shaped input never lose text in the
+rendered output.
 
 ## License
 
