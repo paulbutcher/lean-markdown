@@ -19,7 +19,7 @@ name = "CommonMark"
 [[lean_lib]]
 name = "TestData"
 srcDir = "test"
-globs = ["SpecExamples", "Conformance", "ZipperLaws", "ParserLaws"]
+globs = ["SpecExamples", "Conformance", "ZipperLaws", "ParserLaws", "HtmlWellFormedness"]
 
 [[lean_exe]]
 name = "test"

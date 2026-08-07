@@ -78,7 +78,7 @@ end
 -- then the literal newline that follows it in the spec's output), so the natural shape is
 -- `Inline → List (Html.Node .phrasing)`, flattened over a `List Inline` by `inlineListNodes`.
 mutual
-private def inlineNodes (i : Inline) : List (Html.Node .phrasing) :=
+def inlineNodes (i : Inline) : List (Html.Node .phrasing) :=
   match i with
   | .text s => [(s : Html.Node .phrasing)]
   | .code s => [Html.code [(s : Html.Node .phrasing)]]
@@ -92,7 +92,7 @@ private def inlineNodes (i : Inline) : List (Html.Node .phrasing) :=
   | .softBreak => [("\n" : Html.Node .phrasing)]
   | .lineBreak => [Html.br {}, ("\n" : Html.Node .phrasing)]
 
-private def inlineListNodes : List Inline → List (Html.Node .phrasing)
+def inlineListNodes : List Inline → List (Html.Node .phrasing)
   | [] => []
   | i :: rest => inlineNodes i ++ inlineListNodes rest
 end
@@ -106,7 +106,7 @@ def renderInline (i : Inline) : String :=
 def renderInlines (content : List Inline) : String :=
   (inlineListNodes content).foldl (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
 
-private def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.Node .flow :=
+def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.Node .flow :=
   match level.val with
   | 0 => Html.h1 children
   | 1 => Html.h2 children
@@ -119,59 +119,65 @@ private def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) 
 -- than structural recursion on Block/List Block, since the doubly-nested `list` items make
 -- that relationship opaque to the termination checker; see the analogous parser code.
 --
--- `blockquote`/`ul`/`ol`/`li` wrapping stays hand-assembled string concatenation, unlike
--- the leaf-level tags above: their content recurses back through this same fuel-bounded
--- pair, which doesn't fit `Html.Node`'s children-are-already-built-`Node`s shape without
--- restructuring the whole recursion into tree-building. Their open/closing tags are fixed
--- literal strings (or, for `<ol start="N">`, a `Nat` rendered via `toString`, never
--- containing `<`/`>`/`"`), so this doesn't cost anything at the leaves, only at these four
--- wrapper tags.
+-- The spec's exact-byte-match output has whitespace conventions (a newline after every
+-- non-tight-paragraph block, a tight paragraph suppressing its own leading/trailing
+-- newline, `<li>` vs `<li>\n`, ...) with no room in a well-typed `Node` tree for an
+-- "almost-Node" -- they're represented as explicit `"\n"` leaves spliced into the
+-- children lists alongside the real content. `Html.escape "\n" = "\n"` (no escapable
+-- characters), and the library's `Coe String (Node cat)` instance is category-polymorphic,
+-- so a bare `"\n"` is valid directly between `<li>` elements (`Node .listItem`), not just
+-- inside flow/phrasing content.
 mutual
-private def renderBlockF (tight : Bool) : Nat → Block → String
-  | 0, _ => ""
+def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
+  | 0, _ => []
   | _ + 1, .paragraph content =>
-    if tight then renderInlines content
-    else (Html.p (inlineListNodes content)).render (selfClosingVoid := true) ++ "\n"
-  | _ + 1, .heading level content =>
-    (headingNode level (inlineListNodes content)).render (selfClosingVoid := true) ++ "\n"
+    if tight then (inlineListNodes content).map (fun (n : Html.Node .phrasing) => (n : Html.Node .flow))
+    else [Html.p (inlineListNodes content), "\n"]
+  | _ + 1, .heading level content => [headingNode level (inlineListNodes content), "\n"]
   | _ + 1, .codeBlock info literal =>
     let classAttrs : Html.HtmlAttrs := match info with
       | some i =>
         let lang := (i.splitOn " ").head?.getD i
         if lang.isEmpty then {} else { class_ := s!"language-{lang}" }
       | none => {}
-    (Html.pre [Html.code [(literal : Html.Node .phrasing)] classAttrs]).render
-      (selfClosingVoid := true) ++ "\n"
-  | _ + 1, .thematicBreak => (Html.hr {}).render (selfClosingVoid := true) ++ "\n"
-  | _ + 1, .htmlBlock s => if s.endsWith "\n" then s else s ++ "\n"
+    [Html.pre [Html.code [(literal : Html.Node .phrasing)] classAttrs], "\n"]
+  | _ + 1, .thematicBreak => [Html.hr {}, "\n"]
+  | _ + 1, .htmlBlock s => [Html.Node.unsafeRaw (if s.endsWith "\n" then s else s ++ "\n")]
   | fuel + 1, .blockQuote content =>
-    "<blockquote>\n" ++ renderBlocksF false fuel content ++ "</blockquote>\n"
+    [Html.blockquote (("\n" : Html.Node .flow) :: renderBlocksNodeF false fuel content), "\n"]
   | fuel + 1, .list kind isTight items =>
-    let (openTag, closeTag) := match kind with
-      | .bullet _ => ("<ul>", "</ul>")
+    let itemNodes : List (Html.Node .listItem) :=
+      ("\n" : Html.Node .listItem) ::
+        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, "\n"]) []
+    let listNode : Html.Node .flow := match kind with
+      | .bullet _ => Html.ul itemNodes
       | .ordered start _ =>
-        if start == 1 then ("<ol>", "</ol>") else (s!"<ol start=\"{start}\">", "</ol>")
-    -- Tightness only suppresses the paragraph wrapper (and its surrounding newlines); an
-    -- item whose first block is anything else is rendered exactly as in a loose list.
-    let itemOpen (content : List Block) : String :=
-      match content with
-      | [] => "<li>"
-      | .paragraph _ :: _ => if isTight then "<li>" else "<li>\n"
-      | _ => "<li>\n"
-    let itemsHtml := items.foldl
-      (fun acc content => acc ++ itemOpen content ++ renderBlocksF isTight fuel content ++ "</li>\n") ""
-    openTag ++ "\n" ++ itemsHtml ++ closeTag ++ "\n"
+        if start == 1 then Html.ol itemNodes else Html.ol itemNodes { start := toString start }
+    [listNode, "\n"]
 
-private def renderBlocksF (tight : Bool) : Nat → List Block → String
-  | 0, _ => ""
-  | _ + 1, [] => ""
+def renderBlocksNodeF (tight : Bool) : Nat → List Block → List (Html.Node .flow)
+  | 0, _ => []
+  | _ + 1, [] => []
   | fuel + 1, b :: rest =>
-    let bStr := renderBlockF tight fuel b
-    let restStr := renderBlocksF tight fuel rest
-    -- a tight paragraph renders with no trailing newline of its own; if another block
-    -- follows within the same (tight) item, a separator is still needed between them
-    if tight && !rest.isEmpty && !bStr.endsWith "\n" then bStr ++ "\n" ++ restStr
-    else bStr ++ restStr
+    let bNodes := renderBlockNodesF tight fuel b
+    let restNodes := renderBlocksNodeF tight fuel rest
+    -- a tight paragraph renders with no trailing newline of its own; it's the only block
+    -- kind that doesn't already end with one, so it's the only one needing a separator if
+    -- another block follows within the same (tight) item.
+    if tight && !rest.isEmpty && (match b with | .paragraph _ => true | _ => false) then
+      bNodes ++ [("\n" : Html.Node .flow)] ++ restNodes
+    else bNodes ++ restNodes
+
+-- Tightness only suppresses the paragraph wrapper (and its surrounding newlines); an item
+-- whose first block is anything else is rendered exactly as in a loose list.
+def itemPrefix (isTight : Bool) (content : List Block) : List (Html.Node .flow) :=
+  match content with
+  | [] => []
+  | .paragraph _ :: _ => if isTight then [] else ["\n"]
+  | _ => ["\n"]
+
+def itemNode (isTight : Bool) (fuel : Nat) (content : List Block) : Html.Node .listItem :=
+  Html.li (itemPrefix isTight content ++ renderBlocksNodeF isTight fuel content)
 end
 
 -- Public for the same reason as the inline renderers above: an extension whose own block
@@ -179,7 +185,8 @@ end
 -- needs to render it the same way `renderHtml` does. `tight` selects loose- vs.
 -- tight-list-style paragraph wrapping, matching the meaning of `Block.list`'s own field.
 def renderBlocks (tight : Bool) (blocks : List Block) : String :=
-  renderBlocksF tight (Block.listCount blocks + 1) blocks
+  (renderBlocksNodeF tight (Block.listCount blocks + 1) blocks).foldl
+    (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
 
 /-- Renders a `Document` to HTML per the spec's exact escaping and formatting rules.
     No AST leaf's string content can produce unescaped `<`, `>`, `&`, or unescaped `"`

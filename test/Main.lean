@@ -5,6 +5,7 @@ import SpecExamples
 import Conformance
 import ZipperLaws
 import ParserLaws
+import HtmlWellFormedness
 
 def checkExample (ex : SpecExample) : IO Bool := do
   let actual := CommonMark.renderHtml (CommonMark.parseDocument ex.markdown)
