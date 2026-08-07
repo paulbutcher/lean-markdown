@@ -35,19 +35,16 @@ that's achievable without disproportionate cost.
   added as extra constructors on the shared closed type that every existing exhaustive
   match — including this library's own `Zipper.lean`/`Render/Html.lean` — would have to
   acknowledge forever.
-
-## Open decisions needing sign-off before work starts
-
-1. **Phase 2b (strikethrough) approach** — generalize the existing inline pipeline and
-   prove non-emission, or duplicate it. See Phase 2b; this is the single largest
-   cost/uncertainty item in the whole plan and is worth deciding deliberately rather than
-   defaulting into.
-2. Whether raw-HTML filtering is an AST-level pass (walking `.htmlInline`/`.htmlBlock`
-   before render) or a render-time option — leaning AST-level pass, see Phase 5.
-3. Test suite scope: cmark-gfm's `test/` directory (confirmed via its GitHub repo) has
-   `extensions.txt` (the GFM-equivalent of CommonMark's `spec.txt`, same embedded-example
-   format), plus `regression.txt` and `smart_punct.txt`. This plan only targets
-   `extensions.txt`; decide whether the others are in scope later.
+- **Phase 2b (strikethrough) generalizes the existing inline pipeline and proves
+  non-emission**, rather than duplicating it. See Phase 2b for the two options weighed;
+  this was the single largest cost/uncertainty item in the plan, decided deliberately
+  rather than defaulted into.
+- **Raw-HTML filtering (Phase 5) is an AST-level pass**, walking `.htmlInline`/
+  `.htmlBlock` via `Document.map` before render, rather than a render-time option.
+- **Test suite scope covers all three of cmark-gfm's `test/` example suites**:
+  `extensions.txt` (the GFM-equivalent of CommonMark's `spec.txt`), plus `regression.txt`
+  and `smart_punct.txt`. All three are vendored in `test/vendor/GFM/` (Phase 0); Phase 6
+  generates guards from all three.
 
 ## Phase 0 — Rename and groundwork
 
@@ -65,16 +62,17 @@ that's achievable without disproportionate cost.
 - `CLAUDE.md` and `KNOWN_ISSUES.md` don't reference the project name directly — no
   changes needed there for the rename itself, though `KNOWN_ISSUES.md` will eventually
   want its own GFM-specific gaps once Phase 2 onward surfaces any.
-- Vendor cmark-gfm's `extensions.txt` alongside the existing `spec.txt`/`spec.json` in
-  `test/vendor/`. `scripts/extract_spec.pl` matches the example-fence delimiter with an
-  exact 32-backtick string (`('`' x 32) . ' example'`); a quick check against
-  `extensions.txt` shows the same `` ` `` `` example`` / `.` delimiter convention, but the
-  fence width needs verifying — generalize the match to `^` + one-or-more backticks + `
-  example$` if it doesn't line up exactly, so one script handles both files.
-  `extensions.txt` also opens with a YAML front-matter block (`---\ntitle: ...\n---`)
-  that `spec.txt` doesn't have; confirm the script's state machine skips it harmlessly
-  (it should, since it only reacts to the example-fence and `#`-heading patterns) before
-  trusting the output.
+- Vendor cmark-gfm's `extensions.txt`, `regression.txt`, and `smart_punct.txt`, all from
+  the `0.29.0.gfm.13` tag (the latest tagged release), into `test/vendor/GFM/`, alongside
+  the existing `test/vendor/CommonMark/spec.txt`/`spec.json`. **Done**: `test/vendor/` is
+  now split into `CommonMark/` and `GFM/` subdirectories so it's clear which files apply
+  to which variant. All three GFM files use the same exact 32-backtick example-fence
+  convention as `spec.txt` (`('`' x 32) . ' example'`), so `scripts/extract_spec.pl`
+  needed no changes. `extensions.txt` opens with a YAML front-matter block
+  (`---\ntitle: ...\n---`) that `spec.txt` doesn't have; confirmed the script's state
+  machine skips it harmlessly, since it only reacts to the example-fence and
+  `#`-heading patterns. Extraction verified against all three (30/26/16 examples
+  respectively); not yet wired into generated guard files (Phase 6).
 
 ## Phase 1 — Raw/narrow split for blocks (enables tables)
 
@@ -135,11 +133,10 @@ concretely, not a type parameter. Two ways through this:
   of delicate delimiter-matching logic to keep in sync by hand if the CommonMark
   algorithm itself is ever touched.
 
-**Recommendation: (i).** This project already prefers proofs over parallel
-implementations where the proof is tractable, and a fork here is exactly the kind of
-duplication that tends to silently drift. But this is the single biggest
-cost/uncertainty item in the plan — size it properly (probably the largest phase by
-effort) and confirm the approach before starting rather than defaulting into it.
+**Decided: (i).** This project already prefers proofs over parallel implementations
+where the proof is tractable, and a fork here is exactly the kind of duplication that
+tends to silently drift. This is the single biggest cost/uncertainty item in the plan —
+size it properly; it's probably the largest phase by effort.
 
 **Verification gate for Phases 1-2b:** `lake build` and `lake test` green with zero
 behavior change on the CommonMark path — the existing 652 `#guard`s in
@@ -174,19 +171,19 @@ unmodified base parser already produces:
 ## Phase 5 — Raw-HTML filter
 
 Walk `.htmlInline`/`.htmlBlock` content and neuter GitHub's disallowed tag list before
-render; leaning toward an AST-level pass (via `Document.map`) over a render-time flag, to
-keep it composable with the rest of the pipeline — confirm this choice before
-implementing (open decision 2).
+render, as an AST-level pass (via `Document.map`), to keep it composable with the rest of
+the pipeline.
 
 ## Phase 6 — GFM conformance suite
 
 Adapt the two-stage pipeline this repo just adopted for its own CommonMark suite
 (`scripts/extract_spec.pl`/`scripts/generate_guards.pl`, `test/CheckExample.lean`,
-`test/SpecGuards.lean`) for cmark-gfm's `extensions.txt`, following the same pattern as a
-sibling test target (mirroring `TestData`) rather than a separate project's test suite.
-Expect many generated `#guard`s to fail until Phases 2-5 land — that's expected, and the
-generated file doubles as a concrete, spec-derived checklist of remaining work rather
-than something to write by hand.
+`test/SpecGuards.lean`) for cmark-gfm's `extensions.txt`, `regression.txt`, and
+`smart_punct.txt` (all vendored in Phase 0), following the same pattern as a sibling test
+target (mirroring `TestData`) rather than a separate project's test suite. Expect many
+generated `#guard`s to fail until Phases 2-5 land — that's expected, and the generated
+file doubles as a concrete, spec-derived checklist of remaining work rather than
+something to write by hand.
 
 ## Phase 7 — Docs
 
