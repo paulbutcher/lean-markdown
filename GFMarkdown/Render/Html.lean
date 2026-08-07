@@ -116,13 +116,27 @@ def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
   | fuel + 1, .list kind isTight items =>
     let itemNodes : List (Html.Node .listItem) :=
       ("\n" : Html.Node .listItem) ::
-        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, "\n"]) []
+        items.foldl (fun acc (checked, content) =>
+          acc ++ [itemNode isTight fuel checked content, "\n"]) []
     let listNode : Html.Node .flow := match kind with
       | .bullet _ => Html.ul itemNodes
       | .ordered start _ =>
         if start == 1 then Html.ol itemNodes else Html.ol itemNodes { start := toString start }
     [listNode, "\n"]
   | _ + 1, .table header alignments rows => [tableNode header alignments rows, "\n"]
+
+-- `checked = some _` prefixes the item with GFM's disabled checkbox, taking the place of the
+-- `[ ] `/`[x] ` text `GFMarkdown.Parser.taskListChecked` stripped from its first paragraph.
+-- `disabled`/`checked` are built via `rawAttrs`, not `InputAttrs`'s own boolean fields: those
+-- render as bare HTML5-minimized flags (`disabled`), but cmark-gfm's own output (and this
+-- library's conformance target) uses explicit `disabled=""`/`checked=""`, checked before
+-- disabled.
+def checkboxNodes (checked : Option Bool) : List (Html.Node .flow) :=
+  match checked with
+  | none => []
+  | some isChecked =>
+    let stateAttrs := if isChecked then [("checked", ""), ("disabled", "")] else [("disabled", "")]
+    [(Html.input { type := "checkbox" } stateAttrs : Html.Node .flow), " "]
 
 def renderBlocksNodeF (tight : Bool) : Nat → List Block → List (Html.Node .flow)
   | 0, _ => []
@@ -142,8 +156,9 @@ def itemPrefix (isTight : Bool) (content : List Block) : List (Html.Node .flow) 
   | .paragraph _ :: _ => if isTight then [] else ["\n"]
   | _ => ["\n"]
 
-def itemNode (isTight : Bool) (fuel : Nat) (content : List Block) : Html.Node .listItem :=
-  Html.li (itemPrefix isTight content ++ renderBlocksNodeF isTight fuel content)
+def itemNode (isTight : Bool) (fuel : Nat) (checked : Option Bool) (content : List Block) :
+    Html.Node .listItem :=
+  Html.li (checkboxNodes checked ++ itemPrefix isTight content ++ renderBlocksNodeF isTight fuel content)
 end
 
 def renderBlocks (tight : Bool) (blocks : List Block) : String :=

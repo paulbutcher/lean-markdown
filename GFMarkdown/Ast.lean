@@ -11,13 +11,16 @@ namespace GFMarkdown
     can contain a `strikethrough`, plus `table` itself. There's no `CommonMark.Block` wrapper
     for the non-recursive kinds (paragraph/heading/codeBlock/thematicBreak/htmlBlock): once
     `paragraph`/`heading` need their own `RawInline`-typed content, wrapping the rest bought
-    nothing but an extra case to unwrap everywhere. -/
+    nothing but an extra case to unwrap everywhere. Each `list` item pairs its content with an
+    `Option Bool`: `none` for an ordinary item, `some checked` for a task list item (GFM's
+    `[ ] `/`[x] ` prefix, stripped from the item's first paragraph during parsing). -/
 inductive Block where
   | paragraph  (content : List CommonMark.Parser.RawInline)
   | heading    (level : Fin 6) (content : List CommonMark.Parser.RawInline)
   | codeBlock  (info : Option String) (literal : String)
   | blockQuote (content : List Block)
-  | list       (kind : CommonMark.ListType) (tight : Bool) (items : List (List Block))
+  | list       (kind : CommonMark.ListType) (tight : Bool)
+               (items : List (Option Bool × List Block))
   | thematicBreak
   | htmlBlock  (s : String)
   | table      (header : List (List CommonMark.Parser.RawInline))
@@ -34,12 +37,16 @@ abbrev Document := List Block
 mutual
 def Block.count : Block → Nat
   | .blockQuote content => 1 + Block.listCount content
-  | .list _ _ items => 1 + items.foldl (fun acc c => acc + Block.listCount c) 0
+  | .list _ _ items => 1 + Block.itemsCount items
   | _ => 1
 
 def Block.listCount : List Block → Nat
   | [] => 0
   | b :: rest => 1 + Block.count b + Block.listCount rest
+
+def Block.itemsCount : List (Option Bool × List Block) → Nat
+  | [] => 0
+  | (_, c) :: rest => Block.listCount c + Block.itemsCount rest
 end
 
 end GFMarkdown

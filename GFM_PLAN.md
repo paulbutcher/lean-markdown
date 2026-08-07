@@ -311,21 +311,82 @@ leave a `sorry`-shaped hole and violate "all Lean code should compile without wa
 Confirmed via `lean_diagnostic_messages` and a full `lake clean && lake build && lake test`:
 both report "Unable to find a counter-example," zero warnings.
 
-## Phase 4 — Task lists and extended autolinks
+## Phase 4 — Task lists and extended autolinks — **Done**
 
-Both are pure post-processing over the GFM `Document` (or, for autolinks, even a plain
-`CommonMark.Document`), independent of the harder table/strikethrough work, and can start
-as soon as there's a document to operate on — task list items in particular don't even
-need to wait on Phase 1 onward, since they only need a well-formed list item, which the
-unmodified base parser already produces:
+Both landed as pure post-processing over the already-parsed GFM `Document`, entirely within
+`GFMarkdown/`, touching neither `CommonMark/` nor the shared `RawBlock`/`RawInline` pipeline.
 
-- **Task list items**: detect the `[ ] `/`[x] ` prefix on a list item's first inline
-  content.
-- **Extended autolinks**: bare URL/`www.`/email recognition over `.text` leaves, using
-  `Document.mapInline` (`CommonMark/Ast.lean`). Distinct from this library's existing
-  `matchAutolink`/`matchUriAutolink`/`matchEmailAutolink` (`Parser/Inline.lean`), which
-  only handle CommonMark's angle-bracket form; those aren't reusable directly but are a
-  good structural reference for the character-classification style to match.
+- **Task list items** (`GFMarkdown/Parser.lean`'s `matchTaskListPrefix`/`taskListChecked`,
+  `GFMarkdown/Ast.lean`, `GFMarkdown/Render/Html.lean`): a list item's `[ ] `/`[x] `/`[X] `
+  marker is recognized and stripped from its first paragraph's *raw text*, before
+  `parseInlineRaw` ever sees it, not as a post-process over already-resolved `RawInline`
+  content as originally sketched. The bracket characters would otherwise be swallowed into
+  the inline tokenizer's own link/bracket handling first (`[ ] foo` tokenizes as a failed
+  link attempt, not literal text ready for a simple string-prefix check), so detection has to
+  happen at the block level, alongside the raw-text-to-`Block` conversion. `GFMarkdown.Block`'s
+  `list` constructor changed accordingly: `items : List (List Block)` became
+  `items : List (Option Bool × List Block)`, pairing each item with `none` (ordinary item) or
+  `some checked`. Rendering emits GFM's disabled checkbox (`<input type="checkbox"
+  [checked=""] disabled="" />`) via the `Html` library's `rawAttrs` escape hatch, not
+  `InputAttrs`'s own `checked`/`disabled` boolean fields: those render as bare HTML5-minimized
+  flags (`disabled`, no `=""`), but cmark-gfm's own output always includes the empty value,
+  checked before disabled.
+- **Extended autolinks** (new file, `GFMarkdown/Autolink.lean`): bare `http://`/`https://`/
+  `ftp://`/`www.` URLs and bare/`mailto:`/`xmpp:` emails in ordinary text, grounded in
+  cmark-gfm's `extensions/autolink.c` (`www_match`/`url_match`/`postprocess_text`), fetched
+  and read directly rather than re-derived from the example suite alone, since several rules
+  (trailing-punctuation trimming, the domain underscore-in-last-two-segments rule, the
+  `mailto:`/`xmpp:` word-boundary check) aren't fully pinned down by examples. Implemented as
+  a single post-process walk over the parsed `Document` (`autolinkDocument`), not integrated
+  into the tokenizer the way strikethrough had to be: unlike `~~`, autolinks never compete
+  with `*`/`_` for the same span in `resolveEmphasis`'s delimiter-stack scan, so there's no
+  need to touch `CommonMark/Parser/Inline.lean` at all. This also means cmark-gfm's own
+  architecture split (`www_match`/`url_match` firing mid-tokenize; `postprocess_text`'s email
+  matching firing later, over the fully-resolved tree) collapses into one pass here; the walk
+  still runs URL/`www.` matching before email matching within each merged text run, mirroring
+  that ordering. Distinct from this library's existing `matchAutolink`/`matchUriAutolink`/
+  `matchEmailAutolink` (`CommonMark/Parser/Inline.lean`), which only handle CommonMark's
+  angle-bracket form and aren't reusable here, though they were a useful structural reference
+  for the character-classification style to match.
+  - Landed: `checkDomain`/`autolinkDelim` (shared trailing-trim and domain-validity logic),
+    `matchWww`/`matchScheme` (URL/`www.` matching, single left-to-right pass threading a
+    `prev : Option Char` boundary check, mirroring `tokenizeF`'s own `prev`-threading style),
+    `rewindEmailLocal`/`scanEmailDomainGo`/`tryEmailAt`/`scanEmail` (the email pass, needing
+    genuine backward rewind through a local part, unlike the forward-only URL/`www.` scan, so
+    it works over an `Array Char` with bounds-checked-but-never-panicking access rather than
+    `List Char`), and the `autolinkList`/`autolinkBlockF` walk recursing into emphasis/strong/
+    strikethrough/image content but never into an already-formed link's (matching cmark-gfm's
+    own `in_link` skip in `postprocess`).
+  - Two real bugs surfaced and were fixed during verification against `extensions.json`
+    example 19 (the large combined Autolinks example) rather than smaller ad hoc checks: (a)
+    the email rewind was originally bounded by the `@`'s absolute position rather than by the
+    current scan window's start, letting it look back across text already claimed by an
+    earlier match; (b) `rawInlineListCount` (sizing the fuel for the recursive walk) was
+    missing the "+1 per list-cons step" that `rawBlockListCount`/`Block.listCount` already
+    carry elsewhere in this codebase, silently exhausting fuel exactly one level inside nested
+    `.strong`/`.emph` content (`**Autolink and http://inlines**` failed to link until fixed).
+  - Every indexed access into the email pass's `Array Char` goes through a total `charAt`
+    helper (`Array.getD` with a NUL-char fallback) rather than `!`-indexing, specifically
+    because `extensions.json` example 20 exists to check exactly this: adversarial input
+    (`(_A_@_.A`) must never crash the parser, only ever produce *some* well-formed output.
+  - Documented, deliberately accepted simplifications (none exercised by the vendored example
+    suite): `checkDomainGo` skips the source's escaped-character handling inside a domain;
+    `matchScheme` tests directly at each position rather than literally rewinding through
+    already-tokenized inline nodes, which can only differ from `url_match` for a scheme
+    spanning more than one resolved node (e.g. straddling a backslash escape); a rejected
+    email attempt just moves on to the next `@` rather than replicating the source's exact
+    "skip past the whole failed span" offset arithmetic.
+  - Verified against `extensions.json` examples 19 (Autolinks, in full) and 21 ("should not
+    link" cases), plus 20 (the crash-only "<IGNORE>" case) and the plain `CommonMark` path
+    (confirmed bare URLs/emails still render as literal text, no leakage). Landed as
+    `test/GfmGuards.lean` (examples 1-19, 21, 28-30; 22-27 are the still-unimplemented HTML
+    tag filter and footnotes, excluded rather than left in to fail; example 20 hand-appended
+    since its "<IGNORE>" expected value isn't a real fixture `checkExampleGfm` can compare
+    against, and is checked directly instead).
+
+**Verification gate:** full `lake clean && lake build && lake test` green, zero warnings; all
+of `test/SpecGuards.lean` continues to pass unmodified (neither task lists nor autolinks touch
+`CommonMark/` at all). **Confirmed.**
 
 ## Phase 5 — Raw-HTML filter
 
