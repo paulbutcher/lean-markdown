@@ -29,7 +29,11 @@ spec, `GFM/` for cmark-gfm's extension suites.
   `spec.txt` (same 32-backtick example fence), with a YAML front-matter block
   that `scripts/extract_spec.pl` skips harmlessly since it only reacts to the
   example-fence and `#`-heading patterns; `extract_spec.pl` works on it
-  unmodified.
+  unmodified. `extensions.json` is its extracted example suite, same schema
+  as `spec.json`:
+  ```
+  scripts/extract_spec.pl test/vendor/GFM/extensions.txt > test/vendor/GFM/extensions.json
+  ```
 - `regression.txt` (26 examples: assorted historical bug-regression cases) and
   `smart_punct.txt` (16 examples: smart quote/dash/ellipsis substitution) are
   cmark-gfm's other two example suites, fetched verbatim from the same
@@ -38,8 +42,20 @@ spec, `GFM/` for cmark-gfm's extension suites.
   https://github.com/github/cmark-gfm/blob/0.29.0.gfm.13/test/smart_punct.txt).
   Same fence convention, no front matter; `extract_spec.pl` works on both
   unmodified.
-- None of the three GFM suites are wired into a generated guards file yet; see
-  `GFM_PLAN.md` Phase 6.
+- `test/GfmTableGuards.lean` is generated from `extensions.json`, filtered to
+  examples 1-16 (every "Tables"/"Table cell count mismatches"/"Embedded
+  pipes"/"Oddly-formatted markers"/"Escaping"/"Embedded HTML"/
+  "Reference-style links"/"Sequential cells"/"Interaction with emphasis"/"a
+  table can be recognised..." example -- the sections Phase 2 implements),
+  via `scripts/generate_guards.pl`'s optional checker/import arguments:
+  ```
+  jq '[.[] | select(.example >= 1 and .example <= 16)]' test/vendor/GFM/extensions.json \
+    | scripts/generate_guards.pl /dev/stdin checkExampleGfm CheckExampleGfm > test/GfmTableGuards.lean
+  ```
+  The remaining examples (17-30: strikethrough, autolinks, HTML tag filter,
+  footnotes, task lists) aren't implemented yet; wiring all of `extensions.txt`
+  (and `regression.txt`/`smart_punct.txt`) into one generated suite, expecting
+  many failures until later phases land, is `GFM_PLAN.md` Phase 6.
 
 ## License
 

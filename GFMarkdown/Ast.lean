@@ -22,4 +22,18 @@ inductive Block where
 /-- A parsed GFM document: an ordered list of top-level blocks. -/
 abbrev Document := List Block
 
+-- Total node count, used to size fuel for the renderer's recursion (mirrors
+-- `CommonMark.Block.count`/`listCount`, for the same reason: the doubly-nested `list` items
+-- make the structural relationship opaque to the termination checker).
+mutual
+def Block.count : Block → Nat
+  | .blockQuote content => 1 + Block.listCount content
+  | .list _ _ items => 1 + items.foldl (fun acc c => acc + Block.listCount c) 0
+  | _ => 1
+
+def Block.listCount : List Block → Nat
+  | [] => 0
+  | b :: rest => 1 + Block.count b + Block.listCount rest
+end
+
 end GFMarkdown

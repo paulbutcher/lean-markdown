@@ -378,6 +378,103 @@ def stripLinkRefDefsF :
 def stripLinkRefDefs (chars : List Char) : List (String × String × Option String) × List Char :=
   stripLinkRefDefsF (chars.length + 1) chars
 
+/-- A GFM table column's alignment, from its delimiter row (`:--`/`--:`/`:-:`/`--`). Lives
+    alongside `RawBlock` rather than in the `GFMarkdown` namespace because `RawBlock.table`,
+    produced by the block-level state machine shared by both variants, needs it too, and
+    `CommonMark.Parser` can't depend on `GFMarkdown`. -/
+inductive TableAlignment where
+  | left
+  | right
+  | center
+  | unset
+  deriving Repr, BEq
+
+-- GFM table row scanning. Mirrors cmark-gfm's `row_from_string`/`scan_table_cell`/
+-- `scan_table_cell_end` (extensions/table.c, extensions/ext_scanners.re): a leading `|` is
+-- consumed without producing a cell; cells are separated by unescaped `|` (`isEscapable`
+-- covers the same punctuation set as the scanner's `escaped_char`, so `\|` inside a cell
+-- doesn't split it, and something like `\\|` still splits after the escaped backslash pair);
+-- a clean trailing `|` doesn't produce a trailing empty cell, but e.g. `a||` does produce a
+-- genuinely empty cell between the two pipes.
+def stripTableLeadingPipe : List Char → List Char
+  | '|' :: rest => rest
+  | chars => chars
+
+def scanTableCellChars : List Char → List Char × List Char
+  | [] => ([], [])
+  | '\\' :: c :: rest =>
+    if isEscapable c then
+      let (cell, remainder) := scanTableCellChars rest
+      ('\\' :: c :: cell, remainder)
+    else
+      let (cell, remainder) := scanTableCellChars (c :: rest)
+      ('\\' :: cell, remainder)
+  | '|' :: rest => ([], '|' :: rest)
+  | c :: rest =>
+    let (cell, remainder) := scanTableCellChars rest
+    (c :: cell, remainder)
+
+def tableRowCellsGoF : Nat → List Char → List (List Char)
+  | 0, _ => []
+  | _ + 1, [] => []
+  | fuel + 1, chars =>
+    let (cellChars, remainder) := scanTableCellChars chars
+    match remainder with
+    | '|' :: rest => cellChars :: tableRowCellsGoF fuel rest
+    | _ => [cellChars]
+
+-- Splits a single, already-known-non-blank line into raw table-row cells. `none` only for a
+-- line with no cells at all (e.g. a bare `|`), which cmark-gfm also rejects as not a row.
+def tableRowCellsRaw (line : String) : Option (List (List Char)) :=
+  match tableRowCellsGoF (line.length + 1) (stripTableLeadingPipe line.toList) with
+  | [] => none
+  | cells => some cells
+
+-- Mirrors cmark-gfm's `unescape_pipes`: a naive left-to-right scan that collapses a literal
+-- `\|` to `|`, leaving every other backslash (including other escape sequences, resolved
+-- later by `parseInline`) untouched. Deliberately narrower than `isEscapable`-aware scanning
+-- (unlike `scanTableCellChars` above): this is the exact, if slightly quirky, behavior it
+-- reproduces (it doesn't track which backslashes the cell-splitting pass already paired up,
+-- so it can occasionally "unescape" a pipe cell-splitting had every right to treat as already
+-- spoken for -- a divergence only visible on inputs no real table needs, like a cell ending
+-- `\\\|`).
+def unescapeTablePipesGo : List Char → List Char
+  | [] => []
+  | '\\' :: '|' :: rest => '|' :: unescapeTablePipesGo rest
+  | c :: rest => c :: unescapeTablePipesGo rest
+
+def unescapeTablePipes (s : String) : String := String.ofList (unescapeTablePipesGo s.toList)
+
+-- A row's cell content, pipe-unescaped and trimmed, still deferring backslash-escape/entity
+-- resolution and inline parsing to the block→`Block` conversion step (as `RawBlock.paragraph`
+-- already does for its text).
+def matchTableRow (line : String) : Option (List String) :=
+  (tableRowCellsRaw line).map
+    (·.map (fun cs => (unescapeTablePipes (String.ofList cs)).trimAscii.toString))
+
+def matchTableMarkerCell (cell : String) : Option TableAlignment :=
+  let cs := cell.toList
+  let left := cs.head? == some ':'
+  let right := cs.reverse.head? == some ':'
+  let core := if left then cs.drop 1 else cs
+  let core := if right then core.take (core.length - 1) else core
+  if core.isEmpty || !core.all (· == '-') then none
+  else if left && right then some .center
+  else if left then some .left
+  else if right then some .right
+  else some .unset
+
+-- A table delimiter row (e.g. `| --- | :-: |`): every cell must be `table_marker`-shaped
+-- (optional leading/trailing `:`, one or more `-`, no interior spaces) once trimmed.
+def matchTableDelimiterRow (line : String) : Option (List TableAlignment) :=
+  match tableRowCellsRaw line with
+  | none => none
+  | some cellsChars =>
+    (cellsChars.map (fun cs => (String.ofList cs).trimAscii.toString)).mapM matchTableMarkerCell
+
+def padOrTruncateCells (n : Nat) (cells : List String) : List String :=
+  cells.take n ++ List.replicate (n - cells.length) ""
+
 -- `strictListInterrupt` applies the "ordered lists can only interrupt a paragraph if they
 -- start at 1" rule. That rule exists to stop plain text like "2. bar" from accidentally
 -- starting a list where none was already open; it does not apply when the paragraph being
@@ -394,17 +491,6 @@ def startsNewBlock (strictListInterrupt : Bool) (remainder : String) : Bool :=
       | some (kind, _, afterMarker) =>
         !strictListInterrupt || (!isBlank afterMarker && listMarkerCanInterrupt kind afterMarker)
       | none => false)
-
-/-- A GFM table column's alignment, from its delimiter row (`:--`/`--:`/`:-:`/`--`). Lives
-    alongside `RawBlock` rather than in the `GFMarkdown` namespace because `RawBlock.table`,
-    produced by the block-level state machine shared by both variants, needs it too, and
-    `CommonMark.Parser` can't depend on `GFMarkdown`. -/
-inductive TableAlignment where
-  | left
-  | right
-  | center
-  | unset
-  deriving Repr, BEq
 
 inductive RawBlock where
   | paragraph  (text : String)
@@ -426,6 +512,7 @@ inductive OpenLeaf where
   | indentedCode (lines : Array String)
   | fenced (fenceChar : Char) (fenceLen : Nat) (indent : Nat) (info : Option String) (lines : Array String)
   | html (endKind : HtmlEndKind) (lines : Array String)
+  | table (header : List String) (alignments : List TableAlignment) (rows : Array (List String))
 
 structure Frame where
   container    : Container
@@ -475,6 +562,7 @@ def finalizeLeaf : OpenLeaf → Option RawBlock
     else some (.codeBlock info (String.intercalate "\n" lines.toList ++ "\n"))
   | .html _ lines =>
     some (.htmlBlock (String.intercalate "\n" lines.toList ++ "\n"))
+  | .table header alignments rows => some (.table header alignments rows.toList)
 
 -- Link reference definitions are only recognized as a (possibly multi-line) prefix of what
 -- would otherwise be a paragraph, so they're stripped off here rather than in `finalizeLeaf`.
@@ -603,7 +691,37 @@ def startBlockFrom (st : State) (remainder : String) (carry : Option (ListType �
           else
             { st1 with leaf := .paragraph #[stripUpTo3 remainder2] }
 
-def processLine (st : State) (line : String) : State :=
+-- Tries to convert the paragraph currently open in `st` into a GFM table, given `delimiterLine`
+-- is the line right after it: `delimiterLine` must be a valid delimiter row whose column count
+-- matches the paragraph's *last* buffered line (its prospective header). A paragraph with more
+-- lines before that one has them split off into their own paragraph. Mirrors cmark-gfm's
+-- `try_opening_table_header`, which likewise only ever promotes a table's last accumulated line
+-- to its header, regardless of how many lines preceded it.
+def tryOpenTableFromParagraph (st : State) (delimiterLine : String) : Option State :=
+  match st.leaf with
+  | .paragraph lines =>
+    match lines.back? with
+    | none => none
+    | some headerLine =>
+      match matchTableDelimiterRow delimiterLine, matchTableRow headerLine with
+      | some alignments, some headerCells =>
+        if alignments.length ≠ headerCells.length then none
+        else
+          let leadingLines := lines.pop
+          let st1 :=
+            if leadingLines.isEmpty then st
+            else
+              let (defs, remChars) :=
+                stripLinkRefDefs (String.intercalate "\n" leadingLines.toList).toList
+              let stWithDefs :=
+                { st with linkDefs := defs.foldl (fun acc d => acc.push d) st.linkDefs }
+              if remChars.isEmpty then stWithDefs
+              else stWithDefs.pushBlock (.paragraph (String.ofList remChars))
+          some { st1 with leaf := .table headerCells alignments #[] }
+      | _, _ => none
+  | _ => none
+
+def processLine (gfmTables : Bool) (st : State) (line : String) : State :=
   let (m, remainder) := matchContainers st.frames line
   let n := st.frames.size
   if m == n then
@@ -646,7 +764,16 @@ def processLine (st : State) (line : String) : State :=
           if startsNewBlock true remainder then
             startBlockFrom st.closeLeaf remainder none
           else
-            st.appendParagraphLine (stripLeadingWs remainder)
+            match (if gfmTables then tryOpenTableFromParagraph st remainder else none) with
+            | some st' => st'
+            | none => st.appendParagraphLine (stripLeadingWs remainder)
+    | .table header alignments rows =>
+      if isBlank remainder then (st.closeLeaf).markPendingBlank
+      else
+        match matchTableRow remainder with
+        | some cells =>
+          { st with leaf := .table header alignments (rows.push (padOrTruncateCells header.length cells)) }
+        | none => startBlockFrom st.closeLeaf remainder none
     | .empty =>
       -- A list item can begin with at most one blank line: a second consecutive blank line
       -- while the innermost item still has no content ends that item as empty right away,
@@ -677,8 +804,8 @@ def processLine (st : State) (line : String) : State :=
       if isBlank remainder then st2.markPendingBlank
       else startBlockFrom st2 remainder carry
 
-def runLines (lines : List String) : State :=
-  lines.foldl processLine initialState
+def runLines (gfmTables : Bool) (lines : List String) : State :=
+  lines.foldl (processLine gfmTables) initialState
 
 def finalizeState (st : State) : List RawBlock × LinkDefs :=
   let st1 := st.closeLeaf
@@ -768,7 +895,7 @@ namespace CommonMark
     looping. Matches the official example suite exactly (see the `#guard` checks in
     `test/SpecGuards.lean`). -/
 def parseDocument (s : String) : Document :=
-  let (blocks, defs) := Parser.finalizeState (Parser.runLines (Parser.splitLines s))
+  let (blocks, defs) := Parser.finalizeState (Parser.runLines false (Parser.splitLines s))
   Parser.groupAndConvert defs blocks
 
 end CommonMark

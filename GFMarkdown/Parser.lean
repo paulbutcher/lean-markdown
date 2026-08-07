@@ -39,3 +39,16 @@ def groupAndConvertGfm (defs : LinkDefs) (blocks : List RawBlock) : List GFMarkd
   groupAndConvertGfmF defs (rawBlockListCount blocks + 1) blocks
 
 end GFMarkdown.Parser
+
+namespace GFMarkdown
+
+/-- Parses a GFM document into an AST. Total, for the same reason `CommonMark.parseDocument`
+    is: every input string produces a `Document` rather than panicking or looping. Currently
+    covers CommonMark's base syntax plus GFM tables; see `GFM_PLAN.md` for what's still to
+    come (strikethrough, task lists, extended autolinks, the raw-HTML filter). -/
+def parseDocument (s : String) : Document :=
+  let (blocks, defs) :=
+    CommonMark.Parser.finalizeState (CommonMark.Parser.runLines true (CommonMark.Parser.splitLines s))
+  Parser.groupAndConvertGfm defs blocks
+
+end GFMarkdown

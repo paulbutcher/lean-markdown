@@ -22,4 +22,5 @@ name = "GFMarkdown"
 [[lean_lib]]
 name = "TestData"
 srcDir = "test"
-globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness"]
+globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
+  "CheckExampleGfm", "GfmTableGuards"]
