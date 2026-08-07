@@ -12,6 +12,9 @@ Lean 4.
   input; no `partial` functions anywhere in the library.
 - **Safe**: `renderHtml` is proved to never let an AST leaf's string content produce
   unescaped HTML markup, or break out of an attribute.
+- **Well-formed**: for input with no embedded raw HTML, `renderHtml`'s output is proved
+  well-formed HTML: balanced tags, with no stray `<`/`>` outside of tag delimiters
+  (`renderHtml_wellFormed` in `test/HtmlWellFormedness.lean`).
 
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for the handful of places where the
 implementation trades a small amount of spec-letter fidelity, mostly full-Unicode-table
