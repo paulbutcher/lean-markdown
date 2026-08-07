@@ -263,30 +263,53 @@ behavior change on the CommonMark path — the existing 652 `#guard`s in
 `test/SpecGuards.lean` and all of `ZipperLaws.lean`/`ParserLaws.lean`/
 `HtmlWellFormedness.lean` pass unmodified throughout. **Confirmed.**
 
-## Phase 3 — Non-emission proofs
+## Phase 3 — Non-emission properties — **Done**
 
-Formalize what Phases 1-2b established informally: `CommonMark.parseDocument` never
-produces output requiring GFM-only handling, and (for whichever parts ended up inside the
-shared type rather than behind the raw/narrow split) `CommonMark.renderHtml` never
-depends on cases that can't occur. Land these as theorems in `test/`, matching the
-existing convention (`ZipperLaws.lean`, `ParserLaws.lean`, `HtmlWellFormedness.lean`) of
-proving properties nothing in the library itself depends on.
+The goal was to formalize what Phases 1-2b established informally: `CommonMark.parseDocument`
+never produces output requiring GFM-only handling. The two concrete items: (1)
+`RawBlock.table`'s fallback case in `CommonMark.Parser.rawBlockToBlockF` (`Block.lean`) is
+unreachable when `gfmTables = false` in `runLines`/`processLine`'s call chain; (2)
+`narrowInline`'s `.strikethrough` fallback (`Inline.lean`) is unreachable in `parseInline`'s
+call to `parseInlineRaw false defs s`.
 
-The concrete, known items: (1) `RawBlock.table`'s fallback case in
-`CommonMark.Parser.rawBlockToBlockF` (`Block.lean`) is unreachable when `gfmTables = false`
-in `runLines`/`processLine`'s call chain; (2) `narrowInline`'s `.strikethrough` fallback
-(`Inline.lean`) is unreachable in `parseInline`'s call to `parseInlineRaw false defs s` —
-this second one is the harder proof, since `resolveEmphasis`'s `Id.run`/`for`/`mut`
-imperative style doesn't unfold equationally the way this project's other proofs
-(pattern-matched recursion) do; expect to either find an induction principle that works
-over its `for`-loop structure, or refactor it into an equivalent pattern-matched recursive
-form first (which would itself need to preserve the file's own performance-safety
-argument, the `bottoms`/`tildeBottom` O(n²)-avoidance comment) before the proof becomes
-tractable. Both are the same shape of claim as `HtmlWellFormedness.lean`'s existing
-"no `.htmlInline`/`.htmlBlock`" precondition, so that file's proof structure (`noHtml`-style
-decidable predicate, structural induction showing the parser never produces `false` for it)
-is the closest existing template, even though neither of *this* phase's two proofs are
-about the renderer the way that one is.
+**Decided against full formal proof, in favor of Plausible property tests.** Investigated
+proving both as theorems first: item (1)'s call chain runs through `Id.run`/`for`/`mut` loops
+(`closeFramesTo`, `matchContainers`, `tryOpenContainers`, `startBlockFrom`) that don't
+themselves touch table state, so it looked tractable via `Std.Legacy.Range.forIn_eq_forIn_range'`
+(a `@[simp]` lemma this toolchain, Lean 4.32.2, provides to rewrite `for i in [a:b] do ...`
+into a `List.forIn` fold, which unfolds equationally the way the rest of this project's proofs
+do). Item (2), though, runs through `resolveEmphasis`: nested loops, several mutable
+variables, early `break`s, and the invariant has to survive the actual delimiter-matching
+logic — open-ended proof engineering with no fixed bound, not a bounded task, and this
+codebase has no existing precedent for proving properties of `Id.run`/`for`/`mut` code at
+all (`ZipperLaws.lean`/`ParserLaws.lean`/`HtmlWellFormedness.lean` all work over plain
+pattern-matched recursion). Given that asymmetry, asked the user how to scope it; decided to
+replace both items with Plausible property tests instead of theorems — CLAUDE.md's own
+testing guidance names this as a standing alternative to a proof, not just a fallback.
+
+**Landed as `test/GfmNonEmissionProperties.lean`.** Rather than testing the internal claim
+literally (`RawBlock.table`/`.strikethrough` never gets constructed on the plain path, which
+would mean exposing internal `RawBlock`/`RawInline` state to the test), both properties test
+the *observable consequence* through the public `CommonMark.parseDocument`/
+`CommonMark.renderHtml` API instead: if either fallback ever fired, the corresponding
+table/strikethrough-shaped input's text would silently vanish from the rendered output
+(`RawBlock.table`'s fallback is `.paragraph []`; `narrowInline`'s is `.text ""`). This is a
+strictly more relevant guarantee to a consumer of the library than the internal reachability
+claim would have been, and needed no access to internals at all:
+- **Tables**: `Plausible.Testable.check` over `∀ numCols numRows : Nat, ...` builds a
+  table-shaped markdown string from those two (mod'd into 1-4 columns, 0-3 rows) and asserts
+  every header/cell label appears verbatim in the rendered HTML.
+- **Strikethrough**: `∀ tildeCount innerLen : Nat, ...` builds a `~text~`/`~~text~~`-shaped
+  string (mod'd into 1-2 tildes, 1-6 inner chars) and asserts the literal tilde run survives
+  verbatim in the rendered HTML.
+
+Both use `#eval Plausible.Testable.check (...)` directly (not the `#test` macro, to keep the
+call site unambiguous) — this throws and fails compilation the moment a counter-example is
+found, the same "fails the build" ground truth `#guard` already gives the rest of the test
+suite, without ever needing `by plausible`/`admit` inside an actual `theorem` (which would
+leave a `sorry`-shaped hole and violate "all Lean code should compile without warnings").
+Confirmed via `lean_diagnostic_messages` and a full `lake clean && lake build && lake test`:
+both report "Unable to find a counter-example," zero warnings.
 
 ## Phase 4 — Task lists and extended autolinks
 
