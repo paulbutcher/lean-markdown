@@ -1,7 +1,8 @@
-# lean-commonmark
+# lean-markdown
 
 A [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) parser and HTML renderer for
-Lean 4.
+Lean 4, with a GitHub Flavored Markdown (GFM) variant built on top of the same core
+(work in progress).
 
 ## Guarantees
 
@@ -63,7 +64,7 @@ Add to your `lakefile.toml`:
 
 ```toml
 [[require]]
-name = "commonmark"
+name = "markdown"
 git = "<repository URL>"
 ```
 
