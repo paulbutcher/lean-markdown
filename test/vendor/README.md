@@ -81,8 +81,8 @@ spec, `GFM/` for cmark-gfm's extension suites.
   rather than silently skipped.
 - `smart_punct.txt` is entirely excluded from the generated guard suites: every example there
   tests cmark's `--smart` typographic-substitution option (curly quotes, em/en dashes,
-  ellipses), which is a separate cmark-core rendering option, not a GFM syntax extension, and
-  was never in scope for any phase of `GFM_PLAN.md`. This is also why its fences carry no
+  ellipses), which is a separate cmark-core rendering option, not a GFM syntax extension.
+  This is also why its fences carry no
   per-example `extensions` tag: the whole file is meant to be run with `--smart` turned on
   globally, an axis this port doesn't model at all (there's no smart-punctuation pass in either
   `CommonMark` or `GFMarkdown`).

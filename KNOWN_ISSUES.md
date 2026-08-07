@@ -4,6 +4,11 @@ Places where the implementation passes the full official CommonMark 0.31.2 examp
 suite but does not fully match the letter of the spec, because the
 spec examples don't happen to exercise the gap.
 
+Issues #1-4 below are all in `CommonMark/Parser/Inline.lean`'s character-classification
+tables, which `GFMarkdown` reuses directly (it shares the same inline pipeline via
+`RawInline`), so they apply equally to `GFMarkdown.parseDocument`'s output. Issues #5-6
+are specific to the GFM variant.
+
 ## 1. Unicode punctuation/symbol classification is a hand-picked subset
 
 `isUnicodePunctOrSymbol` (`CommonMark/Parser/Inline.lean`), used for emphasis flanking
@@ -51,8 +56,39 @@ surrogate range 0xD800-0xDFFF (e.g. input `&#xD800;`). For a surrogate value,
 Unicode scalar value, `'\0'` is returned instead"), so those references currently
 render as NUL rather than U+FFFD..
 
+## 5. Footnotes aren't implemented
+
+`GFMarkdown` doesn't implement cmark-gfm's footnotes extension at all: `[^label]`
+reference syntax and `[^label]: text` definition syntax both pass through as ordinary
+text (a literal `[^label]`, or a link-reference-definition-shaped paragraph) rather
+than becoming a footnote reference and a rendered `<section class="footnotes">` block.
+Exercised by `extensions.json` examples 23-27 and every `regression.txt` example tagged
+(wholly or partly) `footnotes`; both are excluded from the generated guard suites
+(`test/GfmGuards.lean`, `test/GfmRegressionGuards.lean`) rather than left in to fail.
+
+## 6. Extended autolinks have a few accepted simplifications
+
+`GFMarkdown/Autolink.lean`'s `http://`/`https://`/`ftp://`/`www.`/email autolinking
+deliberately diverges from cmark-gfm's `extensions/autolink.c` in three small ways, none
+exercised by the vendored example suite (see `GFM_PLAN.md`'s Phase 4 writeup for how
+each was verified safe against it):
+
+- `checkDomainGo` skips the source's escaped-character handling inside a domain.
+- `matchScheme` tests directly at each position rather than literally rewinding through
+  already-tokenized inline nodes; this can only differ from `url_match` for a scheme
+  spanning more than one resolved node, e.g. straddling a backslash escape.
+- A rejected email-autolink attempt just moves on to the next `@` rather than
+  replicating the source's exact "skip past the whole failed span" offset arithmetic.
+
+## Non-goals
+
+- **Smart punctuation** (cmark's `--smart` option: curly quotes, em/en dashes,
+  ellipses) is not implemented in either variant. It's a separate cmark-core rendering
+  option, not a GFM syntax extension (see `test/vendor/README.md`'s note on 
+  `smart_punct.txt`).
+
 ## Notes
 
 - None of the above are exercised by the official example suite.
-- All of these would be fixed if Lean had full Unicode character information
+- Issues #1-4 would be fixed if Lean had full Unicode character information
   support.

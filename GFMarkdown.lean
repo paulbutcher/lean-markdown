@@ -8,5 +8,4 @@ import GFMarkdown.Render.Html
 
 Main entry points: `GFMarkdown.parseDocument : String → Document` and
 `GFMarkdown.renderHtml : Document → String`. `GFMarkdown.Block`/`GFMarkdown.Document`
-(`GFMarkdown.Ast`) are the GFM-aware AST, adding `table` alongside CommonMark's block kinds.
-Work in progress: see `GFM_PLAN.md` for the implementation plan and current status. -/
+(`GFMarkdown.Ast`) are the GFM-aware AST, adding `table` alongside CommonMark's block kinds. -/

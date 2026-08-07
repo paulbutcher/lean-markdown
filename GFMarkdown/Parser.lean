@@ -81,7 +81,7 @@ namespace GFMarkdown
 /-- Parses a GFM document into an AST. Total, for the same reason `CommonMark.parseDocument`
     is: every input string produces a `Document` rather than panicking or looping. Covers
     CommonMark's base syntax plus GFM tables, strikethrough, task lists, extended autolinks,
-    and the raw-HTML tag filter; see `GFM_PLAN.md` for what's still to come. -/
+    and the raw-HTML tag filter. -/
 def parseDocument (s : String) : Document :=
   let (blocks, defs) :=
     CommonMark.Parser.finalizeState (CommonMark.Parser.runLines true (CommonMark.Parser.splitLines s))
