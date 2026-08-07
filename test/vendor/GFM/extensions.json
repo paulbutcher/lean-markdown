@@ -5,7 +5,8 @@
     "example": 1,
     "start_line": 13,
     "end_line": 37,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "Hello!\n\n| _abc_ | セン |\n| ----- | ---- |\n| 1. Block elements inside cells don't work. | |\n| But _**inline elements do**_. | x |\n\nHi!\n",
@@ -13,7 +14,8 @@
     "example": 2,
     "start_line": 43,
     "end_line": 73,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "| Not enough table | to be considered table |\n\n| Not enough table | to be considered table |\n| Not enough table | to be considered table |\n\n| Just enough table | to be considered table |\n| ----------------- | ---------------------- |\n\n| ---- | --- |\n\n|x|\n|-|\n\n| xyz |\n| --- |\n",
@@ -21,7 +23,8 @@
     "example": 3,
     "start_line": 77,
     "end_line": 120,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "abc | def\n--- | ---\nxyz | ghi\n",
@@ -29,7 +32,8 @@
     "example": 4,
     "start_line": 124,
     "end_line": 143,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "Hello!\n\n| _abc_ | セン |\n| ----- | ---- |\n| this row has a space at the end | | \n| But _**inline elements do**_. | x |\n\nHi!\n",
@@ -37,7 +41,8 @@
     "example": 5,
     "start_line": 148,
     "end_line": 178,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "aaa | bbb | ccc | ddd | eee\n:-- | --- | :-: | --- | --:\nfff | ggg | hhh | iii | jjj\n",
@@ -45,7 +50,8 @@
     "example": 6,
     "start_line": 182,
     "end_line": 207,
-    "section": "Tables"
+    "section": "Tables",
+    "extensions": ""
   },
   {
     "markdown": "| a | b | c |\n| --- | --- |\n| this | isn't | okay |\n",
@@ -53,7 +59,8 @@
     "example": 7,
     "start_line": 213,
     "end_line": 221,
-    "section": "Table cell count mismatches"
+    "section": "Table cell count mismatches",
+    "extensions": ""
   },
   {
     "markdown": "| a | b | c |\n| --- | --- | ---\n| x\n| a | b\n| 1 | 2 | 3 | 4 | 5 |\n",
@@ -61,7 +68,8 @@
     "example": 8,
     "start_line": 226,
     "end_line": 259,
-    "section": "Table cell count mismatches"
+    "section": "Table cell count mismatches",
+    "extensions": ""
   },
   {
     "markdown": "| a | b |\n| --- | --- |\n| Escaped pipes are \\|okay\\|. | Like \\| this. |\n| Within `\\|code\\| is okay` too. |\n| _**`c\\|`**_ \\| complex\n| don't **\\_reparse\\_**\n",
@@ -69,7 +77,8 @@
     "example": 9,
     "start_line": 265,
     "end_line": 299,
-    "section": "Embedded pipes"
+    "section": "Embedded pipes",
+    "extensions": ""
   },
   {
     "markdown": "| a |\n--- |\n",
@@ -77,7 +86,8 @@
     "example": 10,
     "start_line": 305,
     "end_line": 316,
-    "section": "Oddly-formatted markers"
+    "section": "Oddly-formatted markers",
+    "extensions": ""
   },
   {
     "markdown": "| a | b |\n| --- | --- |\n| \\\\ | `\\\\` |\n| \\\\\\\\ | `\\\\\\\\` |\n| \\_ | `\\_` |\n| \\| | `\\|` |\n| \\a | `\\a` |\n\n\\\\ `\\\\`\n\n\\\\\\\\ `\\\\\\\\`\n\n\\_ `\\_`\n\n\\| `\\|`\n\n\\a `\\a`\n",
@@ -85,7 +95,8 @@
     "example": 11,
     "start_line": 320,
     "end_line": 374,
-    "section": "Escaping"
+    "section": "Escaping",
+    "extensions": ""
   },
   {
     "markdown": "| a |\n| --- |\n| <strong>hello</strong> |\n| ok <br> sure |\n",
@@ -93,7 +104,8 @@
     "example": 12,
     "start_line": 378,
     "end_line": 399,
-    "section": "Embedded HTML"
+    "section": "Embedded HTML",
+    "extensions": ""
   },
   {
     "markdown": "Here's a link to [Freedom Planet 2][].\n\n| Here's a link to [Freedom Planet 2][] in a table header. |\n| --- |\n| Here's a link to [Freedom Planet 2][] in a table row. |\n\n[Freedom Planet 2]: http://www.freedomplanet2.com/\n",
@@ -101,7 +113,8 @@
     "example": 13,
     "start_line": 403,
     "end_line": 425,
-    "section": "Reference-style links"
+    "section": "Reference-style links",
+    "extensions": ""
   },
   {
     "markdown": "| a | b | c |\n| --- | --- | --- |\n| d || e |\n",
@@ -109,7 +122,8 @@
     "example": 14,
     "start_line": 429,
     "end_line": 450,
-    "section": "Sequential cells"
+    "section": "Sequential cells",
+    "extensions": ""
   },
   {
     "markdown": "| a | b |\n| --- | --- |\n|***(a)***|\n",
@@ -117,7 +131,8 @@
     "example": 15,
     "start_line": 454,
     "end_line": 473,
-    "section": "Interaction with emphasis"
+    "section": "Interaction with emphasis",
+    "extensions": ""
   },
   {
     "markdown": "123\n456\n| a | b |\n| ---| --- |\nd | e\n",
@@ -125,7 +140,8 @@
     "example": 16,
     "start_line": 477,
     "end_line": 500,
-    "section": "a table can be recognised when separated from a paragraph of text without an empty line"
+    "section": "a table can be recognised when separated from a paragraph of text without an empty line",
+    "extensions": ""
   },
   {
     "markdown": "A proper ~strikethrough~.\n",
@@ -133,7 +149,8 @@
     "example": 17,
     "start_line": 506,
     "end_line": 510,
-    "section": "Strikethroughs"
+    "section": "Strikethroughs",
+    "extensions": ""
   },
   {
     "markdown": "These are ~not strikethroughs.\n\nNo, they are not~\n\nThis ~is ~ legit~ isn't ~ legit.\n\nThis is not ~~~~~one~~~~~ huge strikethrough.\n\n~one~ ~~two~~ ~~~three~~~\n\nNo ~mismatch~~\n",
@@ -141,7 +158,8 @@
     "example": 18,
     "start_line": 514,
     "end_line": 533,
-    "section": "Strikethroughs"
+    "section": "Strikethroughs",
+    "extensions": ""
   },
   {
     "markdown": ": http://google.com https://google.com\n\n<http://google.com/å> http://google.com/å\n\nscyther@pokemon.com\n\nscy.the_rbe-edr+ill@pokemon.com\n\nscyther@pokemon.com.\n\nscyther@pokemon.com/\n\nscyther@pokemon.com/beedrill@pokemon.com\n\nmailto:scyther@pokemon.com\n\nThis is a mailto:scyther@pokemon.com\n\nmailto:scyther@pokemon.com.\n\nmmmmailto:scyther@pokemon.com\n\nmailto:scyther@pokemon.com/\n\nmailto:scyther@pokemon.com/message\n\nmailto:scyther@pokemon.com/mailto:beedrill@pokemon.com\n\nxmpp:scyther@pokemon.com\n\nxmpp:scyther@pokemon.com.\n\nxmpp:scyther@pokemon.com/message\n\nxmpp:scyther@pokemon.com/message.\n\nEmail me at:scyther@pokemon.com\n\nwww.github.com www.github.com/á\n\nwww.google.com/a_b\n\nUnderscores not allowed in host name www.xxx.yyy._zzz\n\nUnderscores not allowed in host name www.xxx._yyy.zzz\n\nUnderscores allowed in domain name www._xxx.yyy.zzz\n\n**Autolink and http://inlines**\n\n![http://inline.com/image](http://inline.com/image)\n\na.w@b.c\n\nFull stop outside parens shouldn't be included http://google.com/ok.\n\n(Full stop inside parens shouldn't be included http://google.com/ok.)\n\n\"http://google.com\"\n\n'http://google.com'\n\nhttp://🍄.ga/ http://x🍄.ga/\n",
@@ -149,7 +167,8 @@
     "example": 19,
     "start_line": 541,
     "end_line": 638,
-    "section": "Autolinks"
+    "section": "Autolinks",
+    "extensions": ""
   },
   {
     "markdown": "This shouldn't crash everything: (_A_@_.A\n",
@@ -157,7 +176,8 @@
     "example": 20,
     "start_line": 640,
     "end_line": 644,
-    "section": "Autolinks"
+    "section": "Autolinks",
+    "extensions": ""
   },
   {
     "markdown": "These should not link:\n\n* @a.b.c@. x\n* n@.  b\n",
@@ -165,7 +185,8 @@
     "example": 21,
     "start_line": 646,
     "end_line": 657,
-    "section": "Autolinks"
+    "section": "Autolinks",
+    "extensions": ""
   },
   {
     "markdown": "This is <xmp> not okay, but **this** <strong>is</strong>.\n\n<p>This is <xmp> not okay, but **this** <strong>is</strong>.</p>\n\nNope, I won't have <textarea>.\n\n<p>No <textarea> here either.</p>\n\n<p>This <random /> <thing> is okay</thing> though.</p>\n\nYep, <totally>okay</totally>.\n\n<!-- HTML comments are okay, though. -->\n<!- But we're strict. ->\n<! No nonsense. >\n<!-- Leave multiline comments the heck alone, though, okay?\nEven with {\"x\":\"y\"} or 1 > 2 or whatever. Even **markdown**.\n-->\n<!--- Support everything CommonMark's parser does. -->\n<!---->\n<!--thistoo-->\n",
@@ -173,7 +194,8 @@
     "example": 22,
     "start_line": 662,
     "end_line": 700,
-    "section": "HTML tag filter"
+    "section": "HTML tag filter",
+    "extensions": ""
   },
   {
     "markdown": "This is some text![^1]. Other text.[^footnote].\n\nHere's a thing[^other-note].\n\nAnd another thing[^codeblock-note].\n\nThis doesn't have a referent[^nope].\n\n\n[^other-note]:       no code block here (spaces are stripped away)\n\n[^codeblock-note]:\n        this is now a code block (8 spaces indentation)\n\n[^1]: Some *bolded* footnote definition.\n\nHi!\n\n[^footnote]:\n    > Blockquotes can be in a footnote.\n\n        as well as code blocks\n\n    or, naturally, simple paragraphs.\n\n[^unused]: This is unused.\n",
@@ -181,7 +203,8 @@
     "example": 23,
     "start_line": 704,
     "end_line": 760,
-    "section": "Footnotes"
+    "section": "Footnotes",
+    "extensions": ""
   },
   {
     "markdown": "This is some text. It has a footnote[^a-footnote].\n\nThis footnote is referenced[^a-footnote] multiple times, in lots of different places.[^a-footnote]\n\n[^a-footnote]: This footnote definition should have three backrefs.\n",
@@ -189,7 +212,8 @@
     "example": 24,
     "start_line": 764,
     "end_line": 780,
-    "section": "When a footnote is used multiple times, we insert multiple backrefs."
+    "section": "When a footnote is used multiple times, we insert multiple backrefs.",
+    "extensions": ""
   },
   {
     "markdown": "Hello[^\"><script>alert(1)</script>]\n\n[^\"><script>alert(1)</script>]: pwned\n",
@@ -197,7 +221,8 @@
     "example": 25,
     "start_line": 784,
     "end_line": 797,
-    "section": "Footnote reference labels are href escaped"
+    "section": "Footnote reference labels are href escaped",
+    "extensions": ""
   },
   {
     "markdown": "~~www.google.com~~\n\n~~http://google.com~~\n",
@@ -205,7 +230,8 @@
     "example": 26,
     "start_line": 803,
     "end_line": 810,
-    "section": "Interop"
+    "section": "Interop",
+    "extensions": ""
   },
   {
     "markdown": "| a | b |\n| --- | --- |\n| https://github.com www.github.com | http://pokemon.com |\n",
@@ -213,7 +239,8 @@
     "example": 27,
     "start_line": 814,
     "end_line": 833,
-    "section": "Interop"
+    "section": "Interop",
+    "extensions": ""
   },
   {
     "markdown": "- [ ] foo\n- [x] bar\n",
@@ -221,7 +248,8 @@
     "example": 28,
     "start_line": 837,
     "end_line": 845,
-    "section": "Task lists"
+    "section": "Task lists",
+    "extensions": ""
   },
   {
     "markdown": "- [x] foo\n  - [ ] bar\n  - [x] baz\n- [ ] bim\n\nShow a regular (non task) list to show that it has the same structure\n- [@] foo\n  - [@] bar\n  - [@] baz\n- [@] bim\n",
@@ -229,7 +257,8 @@
     "example": 29,
     "start_line": 854,
     "end_line": 885,
-    "section": "Task lists"
+    "section": "Task lists",
+    "extensions": ""
   },
   {
     "markdown": "- [x] foo\n    - [ ] bar\n    - [x] baz\n- [ ] bim\n\nShow a regular (non task) list to show that it has the same structure\n- [@] foo\n    - [@] bar\n    - [@] baz\n- [@] bim\n",
@@ -237,6 +266,7 @@
     "example": 30,
     "start_line": 889,
     "end_line": 920,
-    "section": "Task lists"
+    "section": "Task lists",
+    "extensions": ""
   }
 ]

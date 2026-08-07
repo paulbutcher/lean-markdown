@@ -428,21 +428,83 @@ unfiltered even though it starts with "script") are obvious from the example sui
 of `test/SpecGuards.lean` continues to pass unmodified (the tag filter, like Phase 4, touches
 nothing in `CommonMark/`). **Confirmed.**
 
-## Phase 6 — GFM conformance suite
+## Phase 6 — GFM conformance suite — **Done**
 
-Adapt the two-stage pipeline this repo just adopted for its own CommonMark suite
-(`scripts/extract_spec.pl`/`scripts/generate_guards.pl`, `test/CheckExample.lean`,
-`test/SpecGuards.lean`) for cmark-gfm's `extensions.txt`, `regression.txt`, and
-`smart_punct.txt` (all vendored in Phase 0), following the same pattern as a sibling test
-target (mirroring `TestData`) rather than a separate project's test suite. Expect many
-generated `#guard`s to fail until Phases 2-5 land — that's expected, and the generated
-file doubles as a concrete, spec-derived checklist of remaining work rather than
-something to write by hand. Phase 2 already generated `test/GfmTableGuards.lean` for
-`extensions.txt` examples 1-16 (the table sections) using the same, by-then-already-
-generalized `generate_guards.pl`; this phase's job is examples 17-30 (strikethrough,
-autolinks, HTML tag filter, footnotes, task lists) plus `regression.txt`/`smart_punct.txt`,
-either folded into one combined suite or left as `GfmTableGuards.lean` stays now (decide
-when this phase starts, weighing one generated file against several).
+Widened the vendored suite from just `extensions.txt` (already covered by
+`test/GfmGuards.lean` since earlier phases) to also cover `regression.txt`; `smart_punct.txt`
+turned out to be entirely out of scope (see below). One generated file per source suite, per
+the file-layout decision below, rather than one combined file.
+
+- **`scripts/extract_spec.pl` had a real bug**, surfaced immediately on `regression.txt`:
+  unlike `spec.txt`/`extensions.txt`, `regression.txt` mixes plain-CommonMark and
+  GFM-extension regression cases in one file, so some of its example fences carry extra words
+  after `` ```` example `` (e.g. `` ```` example strikethrough ``, `` ```` example footnotes
+  autolink strikethrough table ``) naming which extension(s) that specific example needs to be
+  checked under. The script's fence-open match was an exact string equality against
+  `` ```` example ``, so any tagged fence failed to match at all, silently misaligning every
+  example's content after it (markdown/HTML bodies were empty or shifted). Fixed to match the
+  fence prefix and capture the trailing tag text into a new `extensions` JSON field
+  (space-separated, `""` when absent); confirmed byte-identical regeneration for `spec.json`
+  and `extensions.json` (neither uses tags) before relying on it for `regression.txt`.
+- **`test/GfmRegressionGuards.lean`** (new file) dispatches each example against `checkExample`
+  (plain CommonMark) when its `extensions` tag is empty, or `checkExampleGfm` (GFM) when tagged
+  with only implemented extensions, merged in example-number order under one set of imports;
+  see `test/vendor/README.md` for the exact regeneration commands. Examples tagged (wholly or
+  partly) `footnotes` are excluded, same reason and same style (a comment, not a silent gap) as
+  `extensions.json`'s existing 23-27 exclusion.
+- **`smart_punct.txt` is excluded entirely, not just deferred.** Every one of its 16 examples
+  tests cmark's `--smart` typographic-substitution option (curly quotes, em/en dashes,
+  ellipses), a separate cmark-core rendering option, not a GFM syntax extension, and never
+  named in any phase of this plan. Its fences carry no per-example `extensions` tag because the
+  whole file is meant to be run with `--smart` on globally, an axis neither `CommonMark` nor
+  `GFMarkdown` models at all.
+- **Three real, pre-existing bugs surfaced** by `regression.txt`'s untagged (plain-CommonMark)
+  examples, none related to GFM and none previously caught by `test/SpecGuards.lean`'s 652
+  examples (confirmed by grepping `spec.json` for similar shapes; none exist, so these are
+  exactly the kind of after-the-fact edge case a regression suite exists to catch that the
+  original spec examples don't happen to exercise). Root-caused against cmark's actual
+  `manual_scan_link_url_2`/`manual_scan_link_url`/`_scan_link_title` (`src/inlines.c`,
+  `src/scanners.re`), fetched and read directly, rather than guessed from the failing examples
+  alone; the first attempt at two of these three fixes was wrong in a way only the C source
+  caught (see below). All three fixed in `CommonMark/Parser/Inline.lean`:
+  - `parseBareDestF` (bare, non-angle-bracket link destinations) treated any `\` + character as
+    an escape pair, consuming both. The reference only treats `\` + *ASCII-punctuation* as an
+    escape pair; `\` followed by anything else (e.g. a space) is just an ordinary literal
+    character, and the following character is then re-examined on its own, so a destination
+    can still end at a space immediately after a literal backslash. The first attempt at this
+    fix instead terminated the destination *before* the backslash whenever the next character
+    wasn't punctuation, which is wrong (it broke two previously-passing `SpecGuards.lean`
+    examples, `foo\bar` and `/url\bar\*baz`, where a backslash before a non-punctuation
+    character is supposed to survive as a literal character within the destination, not end
+    it); caught by rerunning the full suite before considering the fix done, not by inspection.
+  - `parseQuotedTitleF`'s `(...)`-delimited title form (`[link](url (title))`) didn't reject a
+    literal, unescaped `(` appearing before the closing `)`. Per `_scan_link_title`'s grammar,
+    the paren-delimited title form excludes literal parens entirely (unlike the quote-delimited
+    forms, which allow them freely); confirmed this is specific to the paren form, not a
+    general title rule, by reading the regex for all three forms side by side.
+  - `resolveEmphasis`'s rule-of-3 check (`multipleOf3Ok`) and closer-bucketing (`emphBucket`)
+    used each delimiter's *current* (possibly already-reduced-by-an-earlier-partial-match)
+    count. The reference keeps a delimiter's `length` fixed at whatever it was when first
+    tokenized, forever, even as the associated text shrinks from later partial consumption; the
+    rule-of-3 check and bucket index both key off that original, never-updated length. Using
+    the live count instead is what made `a***b* c*` resolve as `a**<em>b</em> c*` instead of the
+    correct `a*<em><em>b</em> c</em>`: after `***` gives up one `*` to close against the `*`
+    after `b`, its remaining live count (2) no longer reflects the original 3-length run the
+    rule-of-3 check needs to see when later checked against the final `*`. Fixed by adding an
+    `origN` field to `INode.delim`, set once at tokenize time and threaded unchanged through
+    every leftover-delimiter reconstruction, used in place of the live count specifically for
+    `multipleOf3Ok`/`emphBucket` (the live count is still what's used everywhere else,
+    strong-vs-regular determination, remaining literal-text length, liveness checks, since
+    those really are about what's currently left, matching the reference's
+    `opener_num_chars`/`closer_num_chars`, which are separate fields from `length`).
+  - Verified via the full example suite: `test/vendor/CommonMark/spec.json`'s existing 652
+    examples all still pass unmodified throughout (rerun after each fix, not just at the end),
+    plus the 3 previously-failing `regression.txt` examples (5, 7, 15, 16 pre-fix; 16
+    independently fixed by the title change, 7 and 15 by the destination change, 5 by the
+    emphasis change).
+
+**Verification gate:** full `lake clean && lake build && lake test` green, zero warnings; all
+652 of `test/SpecGuards.lean` continue to pass. **Confirmed.**
 
 ## Phase 7 — Docs
 

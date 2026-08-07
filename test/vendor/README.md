@@ -40,8 +40,15 @@ spec, `GFM/` for cmark-gfm's extension suites.
   `0.29.0.gfm.13` tag
   (https://github.com/github/cmark-gfm/blob/0.29.0.gfm.13/test/regression.txt,
   https://github.com/github/cmark-gfm/blob/0.29.0.gfm.13/test/smart_punct.txt).
-  Same fence convention, no front matter; `extract_spec.pl` works on both
-  unmodified.
+  Same fence convention as `spec.txt`/`extensions.txt`, no YAML front matter -- but
+  `regression.txt` mixes plain-CommonMark and GFM-extension regression cases in one file, so
+  some of its example fences carry extra words after `example` (e.g. `` ```` example
+  strikethrough `` or `` ```` example footnotes autolink strikethrough table ``), naming which
+  extension(s) that specific example needs. `extract_spec.pl` records this as each example's
+  `extensions` JSON field (space-separated, `""` when absent); it's what `regression.json`'s
+  guard generation below dispatches on. `extensions.txt`/`spec.txt`/`smart_punct.txt` never use
+  this tag (the first two are always run with every extension of their kind enabled; the third
+  is untagged for a different reason, see below).
 - `test/GfmGuards.lean` is generated from `extensions.json`, filtered to whichever examples
   cover the sections implemented so far (currently 1-19, 21, 22, 28-30: Tables through the
   HTML tag filter, plus Task lists), via `scripts/generate_guards.pl`'s optional
@@ -54,10 +61,31 @@ spec, `GFM/` for cmark-gfm's extension suites.
   Example 20 is excluded from the selection above and instead hand-appended to the generated
   file afterward: its expected output is cmark-gfm's own "<IGNORE>" marker (a "just don't crash
   on this" case, not a real HTML fixture), which `checkExampleGfm`'s exact-string check can't
-  express. Examples 23-27 (footnotes) aren't implemented yet; wiring all of `extensions.txt`
-  (and `regression.txt`/`smart_punct.txt`) into one generated suite, expecting many failures
-  until later phases land, is `GFM_PLAN.md` Phase 6 -- at which point this file's
-  incremental-selection approach is superseded by that fuller suite.
+  express. Examples 23-27 (footnotes) aren't implemented yet, and are excluded the same way as
+  example 20's neighbors below.
+- `test/GfmRegressionGuards.lean` is generated from `regression.json`, dispatched per example
+  against either `checkExample` (plain CommonMark, for examples with an empty `extensions` tag)
+  or `checkExampleGfm` (GFM, for examples tagged with only implemented extensions), then merged
+  in example-number order under one set of imports:
+  ```
+  jq '[.[] | select(.extensions == "")]' test/vendor/GFM/regression.json > /tmp/regression_plain.json
+  jq '[.[] | select(.extensions != "" and (.extensions | test("footnotes") | not))]' \
+    test/vendor/GFM/regression.json > /tmp/regression_gfm.json
+  scripts/generate_guards.pl /tmp/regression_plain.json checkExample CheckExample | tail -n +6 > /tmp/plain_body.lean
+  scripts/generate_guards.pl /tmp/regression_gfm.json checkExampleGfm CheckExampleGfm | tail -n +6 > /tmp/gfm_body.lean
+  cat /tmp/plain_body.lean /tmp/gfm_body.lean | grep -v '^$' | sort -t' ' -k3 -n
+  ```
+  then hand-assembled into `test/GfmRegressionGuards.lean` with a shared header importing both
+  `CheckExample` and `CheckExampleGfm`. Examples tagged (wholly or partly) `footnotes` (13,
+  20-25) are excluded, same reason as `extensions.json` 23-27; each gap is marked with a comment
+  rather than silently skipped.
+- `smart_punct.txt` is entirely excluded from the generated guard suites: every example there
+  tests cmark's `--smart` typographic-substitution option (curly quotes, em/en dashes,
+  ellipses), which is a separate cmark-core rendering option, not a GFM syntax extension, and
+  was never in scope for any phase of `GFM_PLAN.md`. This is also why its fences carry no
+  per-example `extensions` tag: the whole file is meant to be run with `--smart` turned on
+  globally, an axis this port doesn't model at all (there's no smart-punctuation pass in either
+  `CommonMark` or `GFMarkdown`).
 
 ## License
 

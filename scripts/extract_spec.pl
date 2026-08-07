@@ -20,6 +20,7 @@ my @markdown_lines;
 my @html_lines;
 my $state = 0; # 0 regular text, 1 markdown example, 2 html output
 my $headertext = '';
+my $extensions = '';
 my @tests;
 
 sub json_string {
@@ -36,8 +37,9 @@ sub json_string {
 while (my $line = <$fh>) {
     $line_number++;
     (my $l = $line) =~ s/^\s+|\s+$//g;
-    if ($l eq ('`' x 32) . ' example') {
+    if ($l =~ /^(?:`{32}) example(?:\s+(.*))?$/) {
         $state = 1;
+        $extensions = defined $1 ? $1 : '';
     } elsif ($state == 2 && $l eq ('`' x 32)) {
         $state = 0;
         $example_number++;
@@ -53,10 +55,12 @@ while (my $line = <$fh>) {
             start_line  => $start_line,
             end_line    => $end_line,
             section     => $headertext,
+            extensions  => $extensions,
         };
         $start_line = 0;
         @markdown_lines = ();
         @html_lines = ();
+        $extensions = '';
     } elsif ($l eq '.') {
         $state = 2;
     } elsif ($state == 1) {
@@ -80,7 +84,8 @@ for my $i (0 .. $#tests) {
     print '    "example": ' . $t->{example} . ",\n";
     print '    "start_line": ' . $t->{start_line} . ",\n";
     print '    "end_line": ' . $t->{end_line} . ",\n";
-    print '    "section": "' . json_string($t->{section}) . "\"\n";
+    print '    "section": "' . json_string($t->{section}) . "\",\n";
+    print '    "extensions": "' . json_string($t->{extensions}) . "\"\n";
     print "  }" . ($i < $#tests ? ",\n" : "\n");
 }
 print "]\n";

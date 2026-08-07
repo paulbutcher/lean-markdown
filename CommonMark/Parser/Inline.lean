@@ -450,12 +450,20 @@ def parseAngleDestF : Nat → List Char → Option (List Char × List Char)
 def parseAngleDest (chars : List Char) : Option (List Char × List Char) :=
   parseAngleDestF (chars.length + 1) chars
 
+-- A backslash only pairs with a following ASCII-punctuation character (matching
+-- `isAsciiPunct`'s escapable set); otherwise it's just an ordinary literal character, and the
+-- char after it is re-examined on its own (so e.g. a backslash immediately before whitespace
+-- still ends the destination there, rather than being swallowed as part of an escape).
 def parseBareDestF : Nat → Nat → List Char → List Char × List Char
   | 0, _, chars => ([], chars)
   | fuel + 1, depth, '\\' :: c :: rest =>
-    let (before, after) := parseBareDestF fuel depth rest
-    ('\\' :: c :: before, after)
-  | _ + 1, _, '\\' :: [] => ([], [])
+    if isAsciiPunct c then
+      let (before, after) := parseBareDestF fuel depth rest
+      ('\\' :: c :: before, after)
+    else
+      let (before, after) := parseBareDestF fuel depth (c :: rest)
+      ('\\' :: before, after)
+  | _ + 1, _, '\\' :: [] => (['\\'], [])
   | fuel + 1, depth, '(' :: rest =>
     let (before, after) := parseBareDestF fuel (depth + 1) rest
     ('(' :: before, after)
@@ -488,6 +496,7 @@ def parseQuotedTitleF (closeChar : Char) : Nat → List Char → Option (List Ch
   | _ + 1, '\\' :: [] => none
   | fuel + 1, c :: rest =>
     if c == closeChar then some ([], rest)
+    else if closeChar == ')' && c == '(' then none
     else
       match parseQuotedTitleF closeChar fuel rest with
       | some (before, after) => some (c :: before, after)
@@ -582,7 +591,12 @@ inductive RawInline where
 inductive INode where
   | text (s : String)
   | resolved (i : RawInline)
-  | delim (c : Char) (n : Nat) (canOpen canClose : Bool)
+  -- `origN` is the delimiter run's length as first tokenized, kept unchanged through any
+  -- number of partial matches that shrink `n`; the rule-of-3 check in `resolveEmphasis`
+  -- depends on it (see the comment there), mirroring how the reference implementation's
+  -- `delimiter->length` field is set once and never mutated even as the associated text
+  -- node's length shrinks.
+  | delim (c : Char) (n : Nat) (origN : Nat) (canOpen canClose : Bool)
   | openBracket (isImage : Bool) (active : Bool)
   | closeBracket (isImage : Bool) (dest : String) (title : Option String) (rawTailText : String)
   | closeBracketFail
@@ -653,7 +667,7 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
       let afterRun := chars.drop run.length
       let co := canOpenDelim c prev afterRun.head?
       let cc := canCloseDelim c prev afterRun.head?
-      .delim c run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
+      .delim c run.length run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
     else if gfmStrikethrough && c == '~' then
       -- GFM only ever treats a run of exactly one or two tildes as an operable delimiter
       -- (`resolveEmphasis`'s tilde matching requires an exact-length pair besides); any other
@@ -664,7 +678,7 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
       if run.length == 1 || run.length == 2 then
         let co := canOpenDelim c prev afterRun.head?
         let cc := canCloseDelim c prev afterRun.head?
-        .delim c run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
+        .delim c run.length run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
       else
         .text (String.ofList run) :: tokenizeF defs gfmStrikethrough fuel stack run.getLast? afterRun
     else
@@ -682,7 +696,7 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
 def flattenNode : INode → RawInline
   | .text s => .text s
   | .resolved i => i
-  | .delim c n _ _ => .text (String.ofList (List.replicate n c))
+  | .delim c n _ _ _ => .text (String.ofList (List.replicate n c))
   | .openBracket isImage _ => .text (if isImage then "![" else "[")
   | .closeBracket _ _ _ rawTailText => .text ("]" ++ rawTailText)
   | .closeBracketFail => .text "]"
@@ -717,11 +731,11 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
     -- Each step either consumes at least one unit from some delimiter run's count (bounded
     -- by the total character count) or moves past a node for good (bounded by array size).
     let fuel := 2 * arr0.size + (arr0.foldl (init := 0) fun acc n =>
-      acc + (match n with | .delim _ n _ _ => n | _ => 1)) + 4
+      acc + (match n with | .delim _ n _ _ _ => n | _ => 1)) + 4
     for _ in [0 : fuel] do
       if i ≥ arr.size then break
       match arr[i]! with
-      | .delim c n closerCanOpen canClose =>
+      | .delim c n origN closerCanOpen canClose =>
         if !canClose || n == 0 then
           i := i + 1
         else if c == '~' then
@@ -729,7 +743,7 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
           for k in [0 : i - tildeBottom] do
             let j := i - 1 - k
             match arr[j]! with
-            | .delim cj _ coj _ => if cj == '~' && coj then foundJ := some j; break
+            | .delim cj _ _ coj _ => if cj == '~' && coj then foundJ := some j; break
             | _ => pure ()
           match foundJ with
           | none =>
@@ -737,7 +751,7 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
             i := i + 1
           | some j =>
             match arr[j]!, arr[i]! with
-            | .delim _ nj _ _, .delim _ ni _ _ =>
+            | .delim _ nj _ _ _, .delim _ ni _ _ _ =>
               -- Unlike `*`/`_`, a length mismatch isn't "no opener found here, keep the
               -- delimiters live for a future match" -- cmark-gfm's own algorithm discards
               -- both outright, back to plain literal tildes, the moment a same-bucket pair is
@@ -756,14 +770,22 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
                 i := i + 1
             | _, _ => i := i + 1
         else
-          let bucket := emphBucket c n closerCanOpen
+          -- The rule-of-3 check (`multipleOf3Ok`) and the bucket a closer is filed under both
+          -- use each delimiter's *original* run length (`origN`), not its current, possibly
+          -- already-reduced count `n`/`nj` -- mirroring the reference implementation, where a
+          -- delimiter's `length` field is set once at tokenize time and never mutated even as
+          -- the associated text shrinks from earlier partial matches. Using the live count
+          -- here instead is what let `a***b* c*` resolve wrongly: after `***` gives up one `*`
+          -- to close against `b`'s following `*`, its remaining live count (2) no longer
+          -- reflects the original 3-length run that the rule-of-3 check needs to see.
+          let bucket := emphBucket c origN closerCanOpen
           let bottom := bottoms[bucket]!
           let mut foundJ : Option Nat := none
           for k in [0 : i - bottom] do
             let j := i - 1 - k
             match arr[j]! with
-            | .delim cj nj coj ccj =>
-              if cj == c && coj && nj > 0 && multipleOf3Ok nj n ccj closerCanOpen then
+            | .delim cj nj origNj coj ccj =>
+              if cj == c && coj && nj > 0 && multipleOf3Ok origNj origN ccj closerCanOpen then
                 foundJ := some j
                 break
             | _ => pure ()
@@ -777,20 +799,20 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
             i := i + 1
           | some j =>
             match arr[j]!, arr[i]! with
-            | .delim cj nj coj ccj, .delim ci ni coi cci =>
+            | .delim cj nj origNj coj ccj, .delim ci ni origNi coi cci =>
               let strong := nj ≥ 2 && ni ≥ 2
               let usedLen := if strong then 2 else 1
               let innerContent := flattenNodes (arr.extract (j + 1) i)
               let newNode : INode :=
                 .resolved (if strong then .strong innerContent else .emph innerContent)
               let openerLeftover : Array INode :=
-                if nj - usedLen == 0 then #[] else #[.delim cj (nj - usedLen) coj ccj]
+                if nj - usedLen == 0 then #[] else #[.delim cj (nj - usedLen) origNj coj ccj]
               let closerLeftoverN := ni - usedLen
               if closerLeftoverN == 0 then
                 arr := arr.extract 0 j ++ openerLeftover ++ #[newNode] ++ arr.extract (i + 1) arr.size
               else
                 arr := arr.extract 0 j ++ openerLeftover ++
-                  #[newNode, .delim ci closerLeftoverN coi cci] ++ arr.extract (i + 1) arr.size
+                  #[newNode, .delim ci closerLeftoverN origNi coi cci] ++ arr.extract (i + 1) arr.size
               -- Everything from `j` on was just renumbered (or removed); any bucket's bottom
               -- that pointed past `j` no longer means anything, so pull it back to `j`.
               bottoms := bottoms.map (min · j)
