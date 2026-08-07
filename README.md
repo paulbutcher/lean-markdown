@@ -6,8 +6,7 @@ Lean 4.
 ## Guarantees
 
 - **Conformant**: matches every example in the official CommonMark example suite,
-  checked at build time as a machine-checked theorem (`commonmark_conformance` in
-  `test/Conformance.lean`), not just an ordinary test run.
+  automatically extracted from the specification (see `test/vendor`).
 - **Total**: `parseDocument` never panics or loops on any input, including adversarial
   input; no `partial` functions anywhere in the library.
 - **Safe**: `renderHtml` is proved to never let an AST leaf's string content produce
