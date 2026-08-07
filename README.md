@@ -92,24 +92,21 @@ lake test    # run the example-suite conformance test and other tests
 
 ## Formal verification
 
-- `BlockZipper`/`InlineZipper` round-trip and navigation laws (`test/ZipperLaws.lean`):
-  the correctness contract that cursor-style document editing relies on.
+- `BlockZipper`/`InlineZipper` round-trip and navigation laws (`test/ZipperLaws.lean`).
 - Newline-normalization algebraic properties (`test/ParserLaws.lean`): output is always
   `\r`-free, and normalization is idempotent.
 - HTML well-formedness (`test/HtmlWellFormedness.lean`,
   `test/GfmHtmlWellFormedness.lean`): for a `Document` with no embedded raw HTML,
-  `renderHtml` produces well-formed HTML (balanced tags, no stray `<`/`>`), for both
-  CommonMark and GFM.
+  `renderHtml` produces well-formed HTML (balanced tags, no stray `<`/`>`).
 
 ## Conformance tests
 
 - `test/SpecGuards.lean`: every example in the official CommonMark spec.
-- `test/GfmGuards.lean`: GFM extension examples (tables, strikethrough, autolinks, HTML
-  tag filter, task lists).
+- `test/GfmGuards.lean`: GFM extension examples.
 - `test/GfmRegressionGuards.lean`: regression cases from cmark-gfm.
 
-All three are generated from the vendored cmark/cmark-gfm test suites by
-`scripts/generate_guards.pl`; see [test/vendor/README.md](test/vendor/README.md).
+All three are generated from the vendored test suites; see 
+[test/vendor/README.md](test/vendor/README.md).
 
 ## Property-based testing
 
