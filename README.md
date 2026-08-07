@@ -80,7 +80,7 @@ Add to your `lakefile.toml`:
 ```toml
 [[require]]
 name = "markdown"
-git = "<repository URL>"
+git = "https://github.com/paulbutcher/lean-markdown"
 ```
 
 ## Development
