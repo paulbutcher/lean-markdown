@@ -1,10 +1,5 @@
 # Known Issues
 
-Issues #1-4 below are all in `CommonMark/Parser/Inline.lean`'s character-classification
-tables, which `GFMarkdown` reuses directly (it shares the same inline pipeline via
-`RawInline`), so they apply equally to `GFMarkdown.parseDocument`'s output. Issues #5-6
-are specific to the GFM variant.
-
 ## 1. Unicode punctuation/symbol classification is a hand-picked subset
 
 `isUnicodePunctOrSymbol` (`CommonMark/Parser/Inline.lean`), used for emphasis flanking
@@ -14,9 +9,6 @@ Currency Symbols block (0x20A0-0x20CF). Punctuation/symbol characters outside th
 ranges (e.g. CJK punctuation, most of the General Punctuation block, mathematical
 operators, emoji) are misclassified as non-punctuation for flanking purposes.
 
-Fix would mean generating a full P*/S* range table from `UnicodeData.txt` and
-switching the lookup from a linear list scan to binary search over sorted ranges.
-
 ## 2. Unicode whitespace classification for flanking is ASCII + NBSP only
 
 `isFlankingWhitespace` (`CommonMark/Parser/Inline.lean`) is supposed to match the
@@ -25,8 +17,6 @@ Unicode `White_Space` property. It only recognizes ASCII whitespace plus U+00A0
 U+205F, U+3000, etc.) aren't recognized, so flanking computed around them can be
 wrong.
 
-Same fix shape as #1: generate the range table from `PropList.txt`.
-
 ## 3. Case folding for reference-label matching is a hand-picked subset
 
 `labelFoldChar`/`expandSharpS` (`CommonMark/Parser/Inline.lean`), used to compare
@@ -34,11 +24,6 @@ link reference labels, are supposed to apply full Unicode case folding. They onl
 cover ASCII, the Latin-1 Supplement, Greek, and the ẞ -> "ss" special case. Two
 labels differing only by case in other scripts (Cyrillic, Armenian, Georgian, etc.)
 won't be recognized as equal when the spec says they should be.
-
-Fix would mean generating the fold table from `CaseFolding.txt`. Most entries are
-simple 1:1 folds (mechanical, same shape as the existing tables); a minority are
-1:many (like the existing ẞ -> "ss" case), which the label-comparison logic already
-has to handle, so the pattern doesn't need to change, just the table size.
 
 ## 4. Numeric character references for lone surrogates don't produce U+FFFD
 
@@ -65,7 +50,7 @@ Exercised by `extensions.json` examples 23-27 and every `regression.txt` example
 ## 6. Extended autolinks have a few simplifications
 
 `GFMarkdown/Autolink.lean`'s `http://`/`https://`/`ftp://`/`www.`/email autolinking
-deliberately diverges from cmark-gfm's `extensions/autolink.c` in three small ways, none
+diverges from cmark-gfm's `extensions/autolink.c` in three small ways, none
 exercised by the vendored example suite:
 
 - `checkDomainGo` skips the source's escaped-character handling inside a domain.
