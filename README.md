@@ -6,21 +6,15 @@ A Markdown parser and HTML renderer for Lean 4. Supports both
 
 ## Guarantees
 
-All four guarantees below hold for both `CommonMark` and `GFMarkdown`, since
-`GFMarkdown` is built directly on `CommonMark`'s parser and shares the same `Html`
-node-construction layer for rendering.
-
 - **Conformant**: `CommonMark.parseDocument` matches every example in the official
   CommonMark example suite; `GFMarkdown.parseDocument` matches cmark-gfm's own
   `extensions.txt`/`regression.txt` suites, except the examples requiring footnotes
   (unimplemented, see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)). Both suites are
   automatically extracted from their respective upstream sources (see `test/vendor`).
 - **Total**: `parseDocument` never panics or loops on any input, including adversarial
-  input; no `partial` functions anywhere in the library, in either variant.
+  input.
 - **Safe**: `renderHtml` is proved to never let an AST leaf's string content produce
-  unescaped HTML markup, or break out of an attribute, for the same reason in both
-  variants: every rendered node is built through the shared `Html` library's typed
-  constructors, never hand-built strings.
+  unescaped HTML markup, or break out of an attribute.
 - **Well-formed**: for input with no embedded raw HTML, `renderHtml`'s output is
   proved well-formed HTML: balanced tags, with no stray `<`/`>` outside of tag
   delimiters (`renderHtml_wellFormed` in `test/HtmlWellFormedness.lean` for
