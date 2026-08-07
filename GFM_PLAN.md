@@ -388,11 +388,45 @@ Both landed as pure post-processing over the already-parsed GFM `Document`, enti
 of `test/SpecGuards.lean` continues to pass unmodified (neither task lists nor autolinks touch
 `CommonMark/` at all). **Confirmed.**
 
-## Phase 5 — Raw-HTML filter
+## Phase 5 — Raw-HTML filter — **Done**
 
-Walk `.htmlInline`/`.htmlBlock` content and neuter GitHub's disallowed tag list before
-render, as an AST-level pass (via `Document.map`), to keep it composable with the rest of
-the pipeline.
+Landed as `GFMarkdown/TagFilter.lean` (new file), an AST-level pass (`tagFilterDocument`)
+walking `.htmlInline`/`.htmlBlock` content, applied in `GFMarkdown.parseDocument` alongside
+`autolinkDocument`; the two passes are independent (autolinks only ever touch `.text` leaves,
+tag filtering only ever touches `.htmlInline`/`.htmlBlock`), so their order doesn't matter.
+
+Grounded in cmark-gfm's `extensions/tagfilter.c` (`is_tag`/`filter`) and `src/html.c`'s
+`filter_html_block`/`CMARK_NODE_HTML_INLINE` case, fetched and read directly: neither the
+"only the opening `<` is escaped, not the tag name or its `>`" behavior nor the "must be
+followed by whitespace/`>`/`/>` to count" word-boundary rule (so `<scripter>` survives
+unfiltered even though it starts with "script") are obvious from the example suite alone.
+
+- **Blacklist**: `title`, `textarea`, `style`, `xmp`, `iframe`, `noembed`, `noframes`,
+  `script`, `plaintext` (case-insensitive, matching either the opening or closing form).
+  `isTagAt`/`shouldFilterTagAt`/`filterHtml` scan a raw HTML string for every `<` and replace
+  just the ones that open or close a blacklisted tag with the literal text `&lt;`, leaving
+  everything else (including that tag's own trailing `>`) untouched.
+- The `RawInline`/`Block` walk (`filterInline`/`filterInlineList`, `filterBlockF`/
+  `filterBlockListF`/`filterItemsF`) mirrors `Autolink.lean`'s structurally, but is simpler in
+  one respect: since filtering a `.htmlInline`/`.htmlBlock` string never turns *one* `RawInline`
+  into several (unlike autolinking a `.text` run, which can split it into text/link
+  alternations), `filterInline`/`filterInlineList`'s recursive calls land on literal structural
+  subterms throughout, so they need no fuel at all, the same `narrowInline`/`narrowInlineList`
+  pattern `CommonMark/Parser/Inline.lean` already establishes. Unlike `Autolink.lean`'s walk,
+  this one *does* recurse into an already-formed link's content (`[<xmp>x</xmp>](url)` still
+  needs its `<xmp>` filtered): tag filtering has nothing to do with link nesting, so there's no
+  reason to skip it there the way autolinking's `in_link` skip does.
+- Verified against `extensions.json` example 22 (the full HTML tag filter section) plus ad hoc
+  checks for interaction with nesting (`**<script>x</script>**`, `[<xmp>x</xmp>](url)`),
+  case-insensitivity (`<SCRIPT>`), and the plain `CommonMark` path (confirmed raw `<script>`
+  passes through completely unfiltered there, since tag filtering is GFM-only, matching how
+  CommonMark's own renderer has always passed raw HTML through unmodified). Added to
+  `test/GfmGuards.lean` (now covering examples 1-19, 21, 22, 28-30; 23-27 remain the
+  unimplemented footnotes, excluded rather than left in to fail).
+
+**Verification gate:** full `lake clean && lake build && lake test` green, zero warnings; all
+of `test/SpecGuards.lean` continues to pass unmodified (the tag filter, like Phase 4, touches
+nothing in `CommonMark/`). **Confirmed.**
 
 ## Phase 6 — GFM conformance suite
 

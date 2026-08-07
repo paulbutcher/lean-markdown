@@ -43,20 +43,20 @@ spec, `GFM/` for cmark-gfm's extension suites.
   Same fence convention, no front matter; `extract_spec.pl` works on both
   unmodified.
 - `test/GfmGuards.lean` is generated from `extensions.json`, filtered to whichever examples
-  cover the sections implemented so far (currently 1-19, 21, 28-30: Tables through Autolinks,
-  plus Task lists), via `scripts/generate_guards.pl`'s optional checker/import arguments.
-  Re-run and widen the selection as later phases land:
+  cover the sections implemented so far (currently 1-19, 21, 22, 28-30: Tables through the
+  HTML tag filter, plus Task lists), via `scripts/generate_guards.pl`'s optional
+  checker/import arguments. Re-run and widen the selection as later phases land:
   ```
-  jq '[.[] | select((.example >= 1 and .example <= 19) or .example == 21
+  jq '[.[] | select((.example >= 1 and .example <= 19) or .example == 21 or .example == 22
     or (.example >= 28 and .example <= 30))]' test/vendor/GFM/extensions.json \
     | scripts/generate_guards.pl /dev/stdin checkExampleGfm CheckExampleGfm > test/GfmGuards.lean
   ```
   Example 20 is excluded from the selection above and instead hand-appended to the generated
   file afterward: its expected output is cmark-gfm's own "<IGNORE>" marker (a "just don't crash
   on this" case, not a real HTML fixture), which `checkExampleGfm`'s exact-string check can't
-  express. Examples 22-27 (HTML tag filter, footnotes) aren't implemented yet; wiring all of
-  `extensions.txt` (and `regression.txt`/`smart_punct.txt`) into one generated suite, expecting
-  many failures until later phases land, is `GFM_PLAN.md` Phase 6 -- at which point this file's
+  express. Examples 23-27 (footnotes) aren't implemented yet; wiring all of `extensions.txt`
+  (and `regression.txt`/`smart_punct.txt`) into one generated suite, expecting many failures
+  until later phases land, is `GFM_PLAN.md` Phase 6 -- at which point this file's
   incremental-selection approach is superseded by that fuller suite.
 
 ## License

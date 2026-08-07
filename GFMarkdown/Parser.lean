@@ -2,6 +2,7 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 import GFMarkdown.Ast
 import GFMarkdown.Autolink
+import GFMarkdown.TagFilter
 
 namespace GFMarkdown.Parser
 
@@ -78,12 +79,12 @@ end GFMarkdown.Parser
 namespace GFMarkdown
 
 /-- Parses a GFM document into an AST. Total, for the same reason `CommonMark.parseDocument`
-    is: every input string produces a `Document` rather than panicking or looping. Currently
-    covers CommonMark's base syntax plus GFM tables, strikethrough, task lists, and extended
-    autolinks; see `GFM_PLAN.md` for what's still to come (the raw-HTML filter). -/
+    is: every input string produces a `Document` rather than panicking or looping. Covers
+    CommonMark's base syntax plus GFM tables, strikethrough, task lists, extended autolinks,
+    and the raw-HTML tag filter; see `GFM_PLAN.md` for what's still to come. -/
 def parseDocument (s : String) : Document :=
   let (blocks, defs) :=
     CommonMark.Parser.finalizeState (CommonMark.Parser.runLines true (CommonMark.Parser.splitLines s))
-  autolinkDocument (Parser.groupAndConvertGfm defs blocks)
+  tagFilterDocument (autolinkDocument (Parser.groupAndConvertGfm defs blocks))
 
 end GFMarkdown
