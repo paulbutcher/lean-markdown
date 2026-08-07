@@ -1,28 +1,16 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
 import CommonMark.Ast
+import Html
 
 namespace CommonMark
 
--- Kept public, unlike most of this file's other helpers: any code producing HTML from
--- Markdown-derived text, including a Markdown-extension renderer built on top of this
--- library, needs the exact same escaping (and gets to reuse the safety proofs below
--- instead of re-deriving them).
-
-def escapeChar (c : Char) : String :=
-  match c with
-  | '&' => "&amp;"
-  | '<' => "&lt;"
-  | '>' => "&gt;"
-  | '"' => "&quot;"
-  | _ => c.toString
-
-def escapeText (s : String) : String :=
-  s.foldl (init := "") fun acc c => acc ++ escapeChar c
-
--- Proven never to let a `<`, `>`, or `"` through raw, no matter what string they're given:
--- the load-bearing fact behind every attribute and text node the renderer produces from
--- AST leaf content. See `escapeChar_safe`/`escapeText_safe` in test/EscapingSafety.lean.
+-- HTML generation goes through `Html.Node`'s typed constructors (`Html/Tags.lean`,
+-- `Html/Node.lean`) rather than hand-built strings: escaping, attribute quoting, and
+-- balanced open/close tags all come from that library's own guarantees instead of being
+-- re-derived here. `Html.Node.unsafeRaw` is used only for `.htmlInline`/`.htmlBlock`
+-- passthrough, the one place literal, unescaped HTML from the Markdown source is meant to
+-- reach the output verbatim.
 
 private def toHexDigit (n : Nat) : Char :=
   if n < 10 then Char.ofNat (n + '0'.toNat) else Char.ofNat (n - 10 + 'A'.toNat)
@@ -48,7 +36,9 @@ private def isUriSafeChar (c : Char) : Bool :=
 
 -- Matches the reference renderers' href/src encoding: percent-encode everything outside a
 -- fixed safe set, but leave an existing well-formed %XX escape alone rather than
--- double-encoding it.
+-- double-encoding it. This is CommonMark-specific (URI percent-encoding isn't something an
+-- HTML library would do); the HTML-attribute escaping a URI also needs on top happens
+-- automatically wherever the result is used as an `Html` attribute value.
 private def percentEncodeUriF : Nat → List Char → String
   | 0, _ => ""
   | _ + 1, [] => ""
@@ -60,47 +50,17 @@ private def percentEncodeUriF : Nat → List Char → String
     if isUriSafeChar c then c.toString ++ percentEncodeUriF fuel rest
     else (utf8Bytes c).foldl (fun acc b => acc ++ byteToPercent b) "" ++ percentEncodeUriF fuel rest
 
--- Percent-encoding leaves characters like `&` untouched (they're valid in a URI), so the
--- result still needs the usual HTML-attribute escaping on top.
-def escapeUri (s : String) : String :=
-  escapeText (percentEncodeUriF (s.length + 1) s.toList)
+def percentEncodeUri (s : String) : String :=
+  percentEncodeUriF (s.length + 1) s.toList
 
--- Proven safe in the same sense as `escapeText`; see `escapeUri_safe` in
--- test/EscapingSafety.lean.
-
--- Public alongside `escapeChar`/`escapeText`/`escapeUri`, for the same reason: a
--- Markdown-extension AST that embeds `List Inline` at its leaves (e.g. a table cell's
--- content) needs to render that embedded content identically to this renderer.
+-- Image alt text and link/heading plain-text needs are the un-escaped text content, with
+-- inline markup stripped; safe to embed anywhere since whatever consumes it (an `Html`
+-- attribute value, in every current use) escapes on the way out.
 mutual
-def renderInline (i : Inline) : String :=
-  match i with
-  | .text s => escapeText s
-  | .code s => "<code>" ++ escapeText s ++ "</code>"
-  | .emph content => "<em>" ++ renderInlines content ++ "</em>"
-  | .strong content => "<strong>" ++ renderInlines content ++ "</strong>"
-  | .link dest title content =>
-    let titleAttr := match title with
-      | some t => " title=\"" ++ escapeText t ++ "\""
-      | none => ""
-    "<a href=\"" ++ escapeUri dest ++ "\"" ++ titleAttr ++ ">" ++ renderInlines content ++ "</a>"
-  | .image dest title content =>
-    let titleAttr := match title with
-      | some t => " title=\"" ++ escapeText t ++ "\""
-      | none => ""
-    "<img src=\"" ++ escapeUri dest ++ "\" alt=\"" ++ plainTextOfInlines content ++ "\"" ++
-      titleAttr ++ " />"
-  | .htmlInline s => s
-  | .softBreak => "\n"
-  | .lineBreak => "<br />\n"
-
-def renderInlines (content : List Inline) : String :=
-  content.foldl (init := "") fun acc i => acc ++ renderInline i
-
--- Image alt text is the plain-text rendering of the content, with inline markup stripped.
 def plainTextOf (i : Inline) : String :=
   match i with
-  | .text s => escapeText s
-  | .code s => escapeText s
+  | .text s => s
+  | .code s => s
   | .emph content => plainTextOfInlines content
   | .strong content => plainTextOfInlines content
   | .link _ _ content => plainTextOfInlines content
@@ -113,30 +73,76 @@ def plainTextOfInlines (content : List Inline) : String :=
   content.foldl (init := "") fun acc i => acc ++ plainTextOf i
 end
 
--- Proven safe too, including the `.htmlInline` case (which drops the raw markup rather
--- than passing it through): see `plainTextOf_safe`/`plainTextOfInlines_safe` in
--- test/EscapingSafety.lean.
+-- A run of inline content is a list of phrasing-content fragments rather than one node
+-- per `Inline`: every case is one fragment except `.lineBreak`, which is two (`<br />`
+-- then the literal newline that follows it in the spec's output), so the natural shape is
+-- `Inline → List (Html.Node .phrasing)`, flattened over a `List Inline` by `inlineListNodes`.
+mutual
+private def inlineNodes (i : Inline) : List (Html.Node .phrasing) :=
+  match i with
+  | .text s => [(s : Html.Node .phrasing)]
+  | .code s => [Html.code [(s : Html.Node .phrasing)]]
+  | .emph content => [Html.em (inlineListNodes content)]
+  | .strong content => [Html.strong (inlineListNodes content)]
+  | .link dest title content =>
+    [Html.a { href := percentEncodeUri dest, title := title } (inlineListNodes content)]
+  | .image dest title content =>
+    [Html.img { src := percentEncodeUri dest, alt := plainTextOfInlines content, title := title }]
+  | .htmlInline s => [Html.Node.unsafeRaw s]
+  | .softBreak => [("\n" : Html.Node .phrasing)]
+  | .lineBreak => [Html.br {}, ("\n" : Html.Node .phrasing)]
+
+private def inlineListNodes : List Inline → List (Html.Node .phrasing)
+  | [] => []
+  | i :: rest => inlineNodes i ++ inlineListNodes rest
+end
+
+-- Public alongside `plainTextOf`/`plainTextOfInlines`, for the same reason: a
+-- Markdown-extension AST that embeds `List Inline` at its leaves (e.g. a table cell's
+-- content) needs to render that embedded content identically to this renderer.
+def renderInline (i : Inline) : String :=
+  (inlineNodes i).foldl (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+
+def renderInlines (content : List Inline) : String :=
+  (inlineListNodes content).foldl (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+
+private def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.Node .flow :=
+  match level.val with
+  | 0 => Html.h1 children
+  | 1 => Html.h2 children
+  | 2 => Html.h3 children
+  | 3 => Html.h4 children
+  | 4 => Html.h5 children
+  | _ => Html.h6 children
 
 -- Recursion is driven by an explicit fuel value (bounded by the total block count) rather
 -- than structural recursion on Block/List Block, since the doubly-nested `list` items make
 -- that relationship opaque to the termination checker; see the analogous parser code.
+--
+-- `blockquote`/`ul`/`ol`/`li` wrapping stays hand-assembled string concatenation, unlike
+-- the leaf-level tags above: their content recurses back through this same fuel-bounded
+-- pair, which doesn't fit `Html.Node`'s children-are-already-built-`Node`s shape without
+-- restructuring the whole recursion into tree-building. Their open/closing tags are fixed
+-- literal strings (or, for `<ol start="N">`, a `Nat` rendered via `toString`, never
+-- containing `<`/`>`/`"`), so this doesn't cost anything at the leaves, only at these four
+-- wrapper tags.
 mutual
 private def renderBlockF (tight : Bool) : Nat → Block → String
   | 0, _ => ""
   | _ + 1, .paragraph content =>
     if tight then renderInlines content
-    else "<p>" ++ renderInlines content ++ "</p>\n"
+    else (Html.p (inlineListNodes content)).render (selfClosingVoid := true) ++ "\n"
   | _ + 1, .heading level content =>
-    let n := level.val + 1
-    s!"<h{n}>" ++ renderInlines content ++ s!"</h{n}>\n"
+    (headingNode level (inlineListNodes content)).render (selfClosingVoid := true) ++ "\n"
   | _ + 1, .codeBlock info literal =>
-    let classAttr := match info with
+    let classAttrs : Html.HtmlAttrs := match info with
       | some i =>
         let lang := (i.splitOn " ").head?.getD i
-        if lang.isEmpty then "" else s!" class=\"language-{escapeText lang}\""
-      | none => ""
-    "<pre><code" ++ classAttr ++ ">" ++ escapeText literal ++ "</code></pre>\n"
-  | _ + 1, .thematicBreak => "<hr />\n"
+        if lang.isEmpty then {} else { class_ := s!"language-{lang}" }
+      | none => {}
+    (Html.pre [Html.code [(literal : Html.Node .phrasing)] classAttrs]).render
+      (selfClosingVoid := true) ++ "\n"
+  | _ + 1, .thematicBreak => (Html.hr {}).render (selfClosingVoid := true) ++ "\n"
   | _ + 1, .htmlBlock s => if s.endsWith "\n" then s else s ++ "\n"
   | fuel + 1, .blockQuote content =>
     "<blockquote>\n" ++ renderBlocksF false fuel content ++ "</blockquote>\n"
@@ -177,8 +183,11 @@ def renderBlocks (tight : Bool) (blocks : List Block) : String :=
 
 /-- Renders a `Document` to HTML per the spec's exact escaping and formatting rules.
     No AST leaf's string content can produce unescaped `<`, `>`, `&`, or unescaped `"`
-    inside an attribute in the output; see the `*_safe` theorems in
-    test/EscapingSafety.lean for the proof. -/
+    inside an attribute in the output: every leaf reaches the output only through
+    `Html.escape`/`Html.Attrs.render`, proved safe by `Html.escape_safe`/
+    `Html.Attrs.render_safe` (github.com/paulbutcher/lean-html), or through
+    `Html.Node.unsafeRaw` for `.htmlInline`/`.htmlBlock` passthrough, where verbatim
+    HTML from the Markdown source is meant to reach the output unescaped. -/
 def renderHtml (doc : Document) : String :=
   renderBlocks false doc
 

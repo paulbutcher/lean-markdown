@@ -15,6 +15,9 @@ Main entry points: `CommonMark.parseDocument : String → Document` and
 (`CommonMark.Zipper`) provide cursor-style navigation and editing over it.
 
 `parseDocument` is total and matches the official example suite exactly (see
-`commonmark_conformance` in `test/Conformance.lean`); `renderHtml` is proved not to let
-any AST leaf's string content produce unescaped HTML markup or break out of an
-attribute (see the `*_safe` theorems in `test/EscapingSafety.lean`). -/
+`commonmark_conformance` in `test/Conformance.lean`); `renderHtml` builds its output
+through the `Html` library's typed constructors (github.com/paulbutcher/lean-html) rather
+than hand-rolled string concatenation, so every AST leaf's string content is escaped by
+construction: it reaches the output only through `Html.Node.text`/`Html.Node.textElement`
+(`Html.escape_safe`, `Html.Node.render_text_safe`, `Html.Node.render_textElement_safe`) or
+`Html.Attrs.render` (`Html.Attrs.render_safe`), all public facts of that library. -/

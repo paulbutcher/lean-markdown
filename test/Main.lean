@@ -4,7 +4,6 @@ import CommonMark
 import SpecExamples
 import Conformance
 import ZipperLaws
-import EscapingSafety
 import ParserLaws
 
 def checkExample (ex : SpecExample) : IO Bool := do
