@@ -750,8 +750,8 @@ namespace CommonMark
 
 /-- Parses a CommonMark document into an AST. Total: every input string, including
     malformed or adversarial input, produces a `Document` rather than panicking or
-    looping. Matches the official example suite exactly (see
-    `test/Conformance.lean`'s `commonmark_conformance` theorem). -/
+    looping. Matches the official example suite exactly (see the `#guard` checks in
+    `test/SpecGuards.lean`). -/
 def parseDocument (s : String) : Document :=
   let (blocks, defs) := Parser.finalizeState (Parser.runLines (Parser.splitLines s))
   Parser.groupAndConvert defs blocks

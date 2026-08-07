@@ -14,8 +14,8 @@ Main entry points: `CommonMark.parseDocument : String → Document` and
 (`CommonMark.Ast`) are the parsed AST; `BlockZipper`/`InlineZipper`
 (`CommonMark.Zipper`) provide cursor-style navigation and editing over it.
 
-`parseDocument` is total and matches the official example suite exactly (see
-`commonmark_conformance` in `test/Conformance.lean`); `renderHtml` builds its output
+`parseDocument` is total and matches the official example suite exactly (see the
+`#guard` checks in `test/SpecGuards.lean`); `renderHtml` builds its output
 through the `Html` library's typed constructors (github.com/paulbutcher/lean-html) rather
 than hand-rolled string concatenation, so every AST leaf's string content is escaped by
 construction: it reaches the output only through `Html.Node.text`/`Html.Node.textElement`

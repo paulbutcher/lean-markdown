@@ -2,11 +2,6 @@
 
 Project-specific guidance for Claude Code when working in this repo.
 
-## Data model
-
-The timetabling database schema and its design rationale are documented in DATA_MODEL.md.
-Read it before changing the schema or migrations, and keep it up to date when they change.
-
 ## Verifying Lean changes
 
 - After editing a `.lean` file, verify it with `mcp__lean-lsp__lean_diagnostic_messages`
