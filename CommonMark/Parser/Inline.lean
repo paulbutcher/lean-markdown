@@ -2,6 +2,7 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 import CommonMark.Ast
 import CommonMark.Parser.Entities
+import UnicodeBasic
 
 namespace CommonMark.Parser
 
@@ -13,14 +14,12 @@ def toLowerStr (s : String) : String :=
 def collapseWhitespace (s : String) : String :=
   String.intercalate " " ((s.splitOn " ").filter (· ≠ "") )
 
--- `Char.toLower` only covers ASCII. Link label matching needs case folding, but the example
--- suite only ever exercises it for Latin-1 Supplement and Greek uppercase letters, so those
--- are the only ranges added on top of the ASCII case, rather than a full Unicode table.
-def labelFoldChar (c : Char) : Char :=
-  let n := c.toNat
-  if n ≥ 0xC0 && n ≤ 0xDE && n ≠ 0xD7 then Char.ofNat (n + 0x20)
-  else if n ≥ 0x391 && n ≤ 0x3A9 && n ≠ 0x3A2 then Char.ofNat (n + 0x20)
-  else c.toLower
+-- `Unicode.getLowerChar` is Unicode's *simple* (one-char-to-one-char) case mapping, covering
+-- every script's lowercase mapping. Label matching needs *full* case fold instead, which
+-- differs from simple mapping only for a handful of code points whose fold expands to more
+-- than one character (e.g. ẞ U+1E9E -> "ss"); `expandSharpS` below handles those separately
+-- since `labelFoldChar` can only ever produce one `Char`.
+def labelFoldChar (c : Char) : Char := Unicode.getLowerChar c
 
 -- Unicode's *full* case fold (as opposed to simple, one-char-to-one-char case mapping) maps
 -- ẞ (U+1E9E) to the two characters "ss", not to ß; that's the mapping label matching needs
@@ -51,7 +50,7 @@ def isUnicodeWhitespace (c : Char) : Bool :=
 -- elsewhere intentionally uses the narrower `isUnicodeWhitespace` above (space/tab/line
 -- ending only), since a non-breaking space there is just an ordinary destination character.
 def isFlankingWhitespace (c : Char) : Bool :=
-  isUnicodeWhitespace c || c.toNat == 0xA0
+  isUnicodeWhitespace c || Unicode.GeneralCategory.isSpaceSeparator c
 
 def isWsOrNone (oc : Option Char) : Bool :=
   match oc with
@@ -59,15 +58,9 @@ def isWsOrNone (oc : Option Char) : Bool :=
   | some c => isFlankingWhitespace c
 
 -- The spec's "Unicode punctuation character" is any character in the Unicode P (punctuation)
--- or S (symbol) general category, which is a much bigger set than ASCII punctuation (e.g. it
--- covers currency signs like £/€). `Char.isAlpha`/`isDigit` only recognize ASCII too, so
--- rather than a full category table, this covers ASCII punctuation plus the Latin-1 and
--- currency-symbol ranges the example suite exercises.
+-- or S (symbol) general category.
 def isUnicodePunctOrSymbol (c : Char) : Bool :=
-  let n := c.toNat
-  isAsciiPunct c
-  || (n ≥ 0xA1 && n ≤ 0xBF && n ≠ 0xAA && n ≠ 0xB5 && n ≠ 0xBA)
-  || (n ≥ 0x20A0 && n ≤ 0x20CF)
+  Unicode.GeneralCategory.isPunctuation c || Unicode.GeneralCategory.isSymbol c
 
 def isPunctChar (oc : Option Char) : Bool :=
   match oc with
