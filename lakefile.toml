@@ -29,4 +29,5 @@ name = "TestData"
 srcDir = "test"
 globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
   "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties",
-  "GfmHtmlWellFormedness", "SanitizeSafety", "GfmSanitizeSafety", "SanitizeExamples"]
+  "GfmHtmlWellFormedness", "SanitizeSafety", "GfmSanitizeSafety", "SanitizeExamples",
+  "EntityReferenceExamples"]

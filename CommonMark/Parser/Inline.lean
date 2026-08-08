@@ -110,7 +110,7 @@ def normalizeCodeSpanContent (raw : List Char) : String :=
 def replacementChar : Char := Char.ofNat 0xFFFD
 
 def codepointToStr (cp : Nat) : String :=
-  if cp == 0 || cp > 0x10FFFF then replacementChar.toString
+  if cp == 0 || cp > 0x10FFFF || (cp ≥ 0xD800 && cp ≤ 0xDFFF) then replacementChar.toString
   else (Char.ofNat cp).toString
 
 def isHexDigit (c : Char) : Bool :=
