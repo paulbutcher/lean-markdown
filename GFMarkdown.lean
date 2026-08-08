@@ -3,6 +3,7 @@
 import GFMarkdown.Ast
 import GFMarkdown.Parser
 import GFMarkdown.Render.Html
+import GFMarkdown.Sanitize
 
 /-! A GitHub Flavored Markdown (GFM) parser and renderer, built on top of `CommonMark`.
 

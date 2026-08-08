@@ -5,6 +5,7 @@ import CommonMark.Parser.Entities
 import CommonMark.Parser.Block
 import CommonMark.Parser.Inline
 import CommonMark.Render.Html
+import CommonMark.Sanitize
 import CommonMark.Zipper
 
 /-! A CommonMark 0.31.2 parser and HTML renderer.

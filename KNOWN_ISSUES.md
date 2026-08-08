@@ -60,6 +60,14 @@ exercised by the vendored example suite:
 - A rejected email-autolink attempt just moves on to the next `@` rather than
   replicating the source's exact "skip past the whole failed span" offset arithmetic.
 
+## 7. `Document.sanitize`'s URI scheme allowlist is deliberately small
+
+`CommonMark.allowedUriSchemes` is `http`, `https`, `mailto`. Other schemes some sites
+treat as safe for links (`tel:`, `sms:`, `xmpp:`, ...) are cleared along with genuinely
+dangerous ones (`javascript:`, `data:`), since the allowlist errs toward rejecting
+anything not positively known to be safe. Not exercised by the vendored example suite
+(neither spec has a notion of "safe rendering"); see `test/SanitizeExamples.lean`.
+
 ## Non-goals
 
 - **Smart punctuation** (cmark's `--smart` option: curly quotes, em/en dashes,

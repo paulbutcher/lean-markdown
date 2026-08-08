@@ -13,6 +13,10 @@ A Markdown parser and HTML renderer for Lean 4. Supports both
 - **Well-formed**: for input with no embedded raw HTML, output is proved well-formed
   HTML.
 
+Both CommonMark and GFM pass raw HTML through verbatim by design. For untrusted input
+use `renderHtmlSafe` which guarantees the output is both safe and well formed,
+including adversarial input.
+
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Usage
@@ -53,6 +57,16 @@ renders:
 <li><input type="checkbox" checked="" disabled="" /> Done</li>
 <li><input type="checkbox" disabled="" /> <del>Not</del> Still to do</li>
 </ul>
+```
+
+For untrusted input, use `renderHtmlSafe` instead of `renderHtml`:
+
+```lean
+open CommonMark
+
+#eval renderHtmlSafe (parseDocument "<script>alert(1)</script>\n\n[x](javascript:alert(1))\n")
+-- <p></p>
+-- <p><a href="">x</a></p>
 ```
 
 `Document.map`/`Document.fold` (`CommonMark.Ast`) cover whole-tree rewrites and
@@ -98,6 +112,9 @@ lake test    # run the example-suite conformance test and other tests
 - HTML well-formedness (`test/HtmlWellFormedness.lean`,
   `test/GfmHtmlWellFormedness.lean`): for a `Document` with no embedded raw HTML,
   `renderHtml` produces well-formed HTML (balanced tags, no stray `<`/`>`).
+- `Document.sanitize` safety (`test/SanitizeSafety.lean`, `test/GfmSanitizeSafety.lean`):
+  its output never contains a `.htmlInline`/`.htmlBlock` leaf, and every `link`/`image`
+  destination in it has an allowlisted URI scheme (or none, i.e. a relative reference).
 
 ## Conformance tests
 
@@ -113,7 +130,9 @@ All three are generated from the vendored test suites; see
 `test/GfmNonEmissionProperties.lean` uses [Plausible](https://github.com/leanprover-community/plausible)
 to fuzz two claims about parser fallback paths that aren't (yet) formally proven: that
 randomly generated tables and strikethrough-shaped input never lose text in the
-rendered output.
+rendered output. `test/SanitizeExamples.lean` fuzzes every capitalization of the
+`javascript:` URI scheme against `renderHtmlSafe`, on top of its hand-picked examples of
+`Document.sanitize` neutralizing specific known-dangerous input end-to-end.
 
 ## License
 
