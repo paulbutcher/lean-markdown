@@ -4,6 +4,8 @@ A Markdown parser and HTML renderer for Lean 4. Supports both
 [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) and 
 [GitHub Flavored Markdown (GFM)](https://github.com/github/cmark-gfm/).
 
+See [A (somewhat) formally verified implementation of Markdown](https://paulbutcher.com/lean-markdown.html)
+
 ## Guarantees
 
 - **Conformant**: passes every test in the official CommonMark and cmark-gfm suites.
