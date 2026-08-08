@@ -1,6 +1,6 @@
 # Known Issues
 
-## 1. Case folding for reference-label matching still has hand-picked exceptions
+## 1. Case folding for reference-label matching is incomplete
 
 `labelFoldChar` (`CommonMark/Parser/Inline.lean`), used to compare link reference
 labels, uses `Unicode.getLowerChar` (from the `UnicodeBasic` library) for Unicode's
@@ -60,12 +60,3 @@ anything not positively known to be safe. Not exercised by the vendored example 
   ellipses) is not implemented in either variant. It's a separate cmark-core rendering
   option, not a GFM syntax extension (see `test/vendor/README.md`'s note on 
   `smart_punct.txt`).
-
-## Notes
-
-- Unicode punctuation/symbol classification (emphasis flanking), Unicode whitespace
-  classification (emphasis flanking), and reference-label case folding all now use
-  full Unicode character data via the `UnicodeBasic` library rather than hand-picked
-  ranges. Issue #1's remaining gap is a handful of full-case-fold-only exceptions
-  that `UnicodeBasic` doesn't expose (it only provides simple case mappings), not a
-  missing-data problem in general.
