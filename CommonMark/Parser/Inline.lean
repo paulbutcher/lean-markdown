@@ -60,7 +60,7 @@ def isWsOrNone (oc : Option Char) : Bool :=
 -- The spec's "Unicode punctuation character" is any character in the Unicode P (punctuation)
 -- or S (symbol) general category.
 def isUnicodePunctOrSymbol (c : Char) : Bool :=
-  Unicode.GeneralCategory.isPunctuation c || Unicode.GeneralCategory.isSymbol c
+  c ∈ Unicode.GC.P ||| Unicode.GC.S
 
 def isPunctChar (oc : Option Char) : Bool :=
   match oc with
