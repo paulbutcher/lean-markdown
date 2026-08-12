@@ -14,23 +14,12 @@ def toLowerStr (s : String) : String :=
 def collapseWhitespace (s : String) : String :=
   String.intercalate " " ((s.splitOn " ").filter (· ≠ "") )
 
--- `Unicode.getLowerChar` is Unicode's *simple* (one-char-to-one-char) case mapping, covering
--- every script's lowercase mapping. Label matching needs *full* case fold instead, which
--- differs from simple mapping only for a handful of code points whose fold expands to more
--- than one character (e.g. ẞ U+1E9E -> "ss"); `expandSharpS` below handles those separately
--- since `labelFoldChar` can only ever produce one `Char`.
-def labelFoldChar (c : Char) : Char := Unicode.getLowerChar c
-
--- Unicode's *full* case fold (as opposed to simple, one-char-to-one-char case mapping) maps
--- ẞ (U+1E9E) to the two characters "ss", not to ß; that's the mapping label matching needs
--- so `[ẞ]` can match a definition labelled `SS`.
-def expandSharpS (s : String) : String :=
-  String.join (s.toList.map (fun c => if c.toNat == 0x1E9E then "ss" else c.toString))
+def foldLabel (s : String) : String := String.join (s.toList.map Unicode.getCaseFolding)
 
 def normalizeLabel (s : String) : String :=
   let collapsed :=
-    collapseWhitespace (String.ofList ((expandSharpS s).toList.map (fun c => if c == '\t' || c == '\n' then ' ' else c)))
-  String.ofList ((collapsed.trimAscii.toString).toList.map labelFoldChar)
+    collapseWhitespace (String.ofList (s.toList.map (fun c => if c == '\t' || c == '\n' then ' ' else c)))
+  foldLabel (collapsed.trimAscii.toString)
 
 def lookupLinkDef (defs : LinkDefs) (label : String) : Option (String × Option String) :=
   let target := normalizeLabel label

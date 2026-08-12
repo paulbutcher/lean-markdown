@@ -75,13 +75,13 @@ private theorem foldl_render_wellFormed {cat : Category} (selfClosingVoid : Bool
 private theorem mem_ite_append {α : Type} (cond : Bool) (A B : List α) (x n : α)
     (hn : n ∈ (if cond = true then A ++ [x] ++ B else A ++ B)) : n ∈ A ∨ n = x ∨ n ∈ B := by
   by_cases hc : cond = true
-  · rw [if_pos hc] at hn
+  · rw [ite_eq_left hc] at hn
     rcases List.mem_append.mp hn with hn | hn
     · rcases List.mem_append.mp hn with hn | hn
       · exact Or.inl hn
       · exact Or.inr (Or.inl (List.mem_singleton.mp hn))
     · exact Or.inr (Or.inr hn)
-  · rw [if_neg hc] at hn
+  · rw [ite_eq_right hc] at hn
     rcases List.mem_append.mp hn with hn | hn
     · exact Or.inl hn
     · exact Or.inr (Or.inr hn)

@@ -1,17 +1,6 @@
 # Known Issues
 
-## 1. Case folding for reference-label matching is incomplete
-
-`labelFoldChar` (`CommonMark/Parser/Inline.lean`), used to compare link reference
-labels, uses `Unicode.getLowerChar` (from the `UnicodeBasic` library) for Unicode's
-*simple* case mapping, which covers every script's ordinary lowercase mapping. The
-spec calls for *full* Unicode case fold, though, which differs from simple mapping
-for a handful of code points whose fold expands to more than one character; only the
-ẞ (U+1E9E) -> "ss" case is handled, via `expandSharpS`. Other full-fold-only
-exceptions (there are only a few dozen in `CaseFolding.txt`, none exercised by the
-vendored example suite) aren't.
-
-## 2. Footnotes aren't implemented
+## 1. Footnotes aren't implemented
 
 `GFMarkdown` doesn't implement cmark-gfm's footnotes extension at all: `[^label]`
 reference syntax and `[^label]: text` definition syntax both pass through as ordinary
@@ -21,7 +10,7 @@ Exercised by `extensions.json` examples 23-27 and every `regression.txt` example
 (wholly or partly) `footnotes`; both are excluded from the generated guard suites
 (`test/GfmGuards.lean`, `test/GfmRegressionGuards.lean`) rather than left in to fail.
 
-## 3. Extended autolinks have a few simplifications
+## 2. Extended autolinks have a few simplifications
 
 `GFMarkdown/Autolink.lean`'s `http://`/`https://`/`ftp://`/`www.`/email autolinking
 diverges from cmark-gfm's `extensions/autolink.c` in three small ways, none
@@ -34,7 +23,7 @@ exercised by the vendored example suite:
 - A rejected email-autolink attempt just moves on to the next `@` rather than
   replicating the source's exact "skip past the whole failed span" offset arithmetic.
 
-## 4. `Document.sanitize`'s URI scheme allowlist is deliberately small
+## 3. `Document.sanitize`'s URI scheme allowlist is deliberately small
 
 `CommonMark.allowedUriSchemes` is `http`, `https`, `mailto`. Other schemes some sites
 treat as safe for links (`tel:`, `sms:`, `xmpp:`, ...) are cleared along with genuinely
