@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.1] - 2026-08-12
+
+Utilise the new UnicodeBasic case folding support.
+
 ## [0.3.0] - 2026-08-08
 
 - Unicode-aware punctuation, whitespace, and case-fold classification via `UnicodeBasic`
