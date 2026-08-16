@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.0] - 2026-08-16
+
+Tidying up and restructuring
+
 ## [0.3.1] - 2026-08-12
 
 Utilise the new UnicodeBasic case folding support.

@@ -2,7 +2,7 @@ import Lake
 open Lake DSL
 
 package markdown where
-  version := v!"0.3.0"
+  version := v!"0.4.0"
 
 require html from git "https://github.com/paulbutcher/lean-html" @ "v0.5.0"
 
