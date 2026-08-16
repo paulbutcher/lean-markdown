@@ -716,24 +716,24 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
       acc + (match n with | .delim _ n _ _ _ => n | _ => 1)) + 4
     for _ in [0 : fuel] do
       if i ≥ arr.size then break
-      match arr[i]! with
-      | .delim c n origN closerCanOpen canClose =>
+      match arr[i]? with
+      | some (.delim c n origN closerCanOpen canClose) =>
         if !canClose || n == 0 then
           i := i + 1
         else if c == '~' then
           let mut foundJ : Option Nat := none
           for k in [0 : i - tildeBottom] do
             let j := i - 1 - k
-            match arr[j]! with
-            | .delim cj _ _ coj _ => if cj == '~' && coj then foundJ := some j; break
+            match arr[j]? with
+            | some (.delim cj _ _ coj _) => if cj == '~' && coj then foundJ := some j; break
             | _ => pure ()
           match foundJ with
           | none =>
             tildeBottom := i
             i := i + 1
           | some j =>
-            match arr[j]!, arr[i]! with
-            | .delim _ nj _ _ _, .delim _ ni _ _ _ =>
+            match arr[j]?, arr[i]? with
+            | some (.delim _ nj _ _ _), some (.delim _ ni _ _ _) =>
               -- Unlike `*`/`_`, a length mismatch isn't "no opener found here, keep the
               -- delimiters live for a future match" -- cmark-gfm's own algorithm discards
               -- both outright, back to plain literal tildes, the moment a same-bucket pair is
@@ -747,8 +747,8 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
                 bottoms := bottoms.map (min · j)
                 i := j + 1
               else
-                arr := arr.set! j (.text (String.ofList (List.replicate nj '~')))
-                arr := arr.set! i (.text (String.ofList (List.replicate ni '~')))
+                arr := arr.setIfInBounds j (.text (String.ofList (List.replicate nj '~')))
+                arr := arr.setIfInBounds i (.text (String.ofList (List.replicate ni '~')))
                 i := i + 1
             | _, _ => i := i + 1
         else
@@ -761,12 +761,12 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
           -- to close against `b`'s following `*`, its remaining live count (2) no longer
           -- reflects the original 3-length run that the rule-of-3 check needs to see.
           let bucket := emphBucket c origN closerCanOpen
-          let bottom := bottoms[bucket]!
+          let bottom := bottoms.getD bucket 0
           let mut foundJ : Option Nat := none
           for k in [0 : i - bottom] do
             let j := i - 1 - k
-            match arr[j]! with
-            | .delim cj nj origNj coj ccj =>
+            match arr[j]? with
+            | some (.delim cj nj origNj coj ccj) =>
               if cj == c && coj && nj > 0 && multipleOf3Ok origNj origN ccj closerCanOpen then
                 foundJ := some j
                 break
@@ -775,13 +775,13 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
           | none =>
             -- No opener for this bucket down to the old bottom, so nothing has changed; no
             -- future closer in this bucket needs to search this far again.
-            bottoms := bottoms.set! bucket i
+            bottoms := bottoms.setIfInBounds bucket i
             if !closerCanOpen then
-              arr := arr.set! i (.text (String.ofList (List.replicate n c)))
+              arr := arr.setIfInBounds i (.text (String.ofList (List.replicate n c)))
             i := i + 1
           | some j =>
-            match arr[j]!, arr[i]! with
-            | .delim cj nj origNj coj ccj, .delim ci ni origNi coi cci =>
+            match arr[j]?, arr[i]? with
+            | some (.delim cj nj origNj coj ccj), some (.delim ci ni origNi coi cci) =>
               let strong := nj ≥ 2 && ni ≥ 2
               let usedLen := if strong then 2 else 1
               let innerContent := flattenNodes (arr.extract (j + 1) i)
@@ -824,36 +824,40 @@ def resolveBrackets (defs : LinkDefs) (gfmStrikethrough : Bool) (arr0 : Array IN
         let mut foundJ : Option Nat := none
         for k in [0 : i - bottom] do
           let j := i - 1 - k
-          match arr[j]! with
-          | .openBracket _ _ => foundJ := some j; break
+          match arr[j]? with
+          | some (.openBracket _ _) => foundJ := some j; break
           | _ => pure ()
         return foundJ
-      match arr[i]! with
-      | .closeBracketFail =>
+      match arr[i]? with
+      | some .closeBracketFail =>
         match ← findOpener with
         | some j =>
-          let openText := match arr[j]! with | .openBracket isImg _ => (if isImg then "![" else "[") | _ => ""
-          arr := arr.set! j (.text openText)
-          arr := arr.set! i (.text "]")
+          let openText := match arr[j]? with
+            | some (.openBracket isImg _) => (if isImg then "![" else "[")
+            | _ => ""
+          arr := arr.setIfInBounds j (.text openText)
+          arr := arr.setIfInBounds i (.text "]")
         | none =>
-          arr := arr.set! i (.text "]")
+          arr := arr.setIfInBounds i (.text "]")
           bottom := i
         i := i + 1
-      | .closeBracket isImage dest title rawTailText =>
+      | some (.closeBracket isImage dest title rawTailText) =>
         match ← findOpener with
         | none =>
-          arr := arr.set! i (.text ("]" ++ rawTailText))
+          arr := arr.setIfInBounds i (.text ("]" ++ rawTailText))
           bottom := i
           i := i + 1
         | some j =>
-          let isActive := match arr[j]! with | .openBracket _ act => act | _ => false
+          let isActive := match arr[j]? with | some (.openBracket _ act) => act | _ => false
           if !isActive then
             -- The already-consumed tail text (e.g. "(/url)" or "[ref]") never gets used, so
             -- it's re-tokenized as ordinary content rather than left as inert literal text:
             -- a reference-style tail like "[ref]" is real bracket syntax that can go on to
             -- form its own independent link, as in `[foo [bar](/1)][ref]`.
-            let openText := match arr[j]! with | .openBracket isImg _ => (if isImg then "![" else "[") | _ => ""
-            arr := arr.set! j (.text openText)
+            let openText := match arr[j]? with
+              | some (.openBracket isImg _) => (if isImg then "![" else "[")
+              | _ => ""
+            arr := arr.setIfInBounds j (.text openText)
             let freshTail :=
               (tokenizeF defs gfmStrikethrough (rawTailText.length + 1) [] (some ']')
                 rawTailText.toList).toArray
@@ -866,8 +870,8 @@ def resolveBrackets (defs : LinkDefs) (gfmStrikethrough : Bool) (arr0 : Array IN
             -- its (alt-text-only) content, so `![` openers stay usable.
             if !isImage then
               for k2 in [0 : j] do
-                match arr[k2]! with
-                | .openBracket false true => arr := arr.set! k2 (.openBracket false false)
+                match arr[k2]? with
+                | some (.openBracket false true) => arr := arr.setIfInBounds k2 (.openBracket false false)
                 | _ => pure ()
             arr := arr.extract 0 j ++ #[newNode] ++ arr.extract (i + 1) arr.size
             -- Same renumbering hazard as in `resolveEmphasis`: `j` and everything after it

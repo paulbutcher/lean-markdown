@@ -867,8 +867,8 @@ def rawBlockToBlockF (defs : LinkDefs) : Nat → RawBlock → CommonMark.Block
   | _ + 1, .htmlBlock s => .htmlBlock s
   | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF defs fuel content)
   | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF defs fuel content]
-  -- Only ever produced when `gfmTables = true` (Phase 2 onward); on the plain CommonMark
-  -- path this arm is unreachable, but the match still has to be total over all of `RawBlock`.
+  -- Only ever produced when `gfmTables = true`; on the plain CommonMark path this arm is
+  -- unreachable, but the match still has to be total over all of `RawBlock`.
   | _ + 1, .table _ _ _ => .paragraph []
 
 def groupAndConvertF (defs : LinkDefs) : Nat → List RawBlock → List CommonMark.Block

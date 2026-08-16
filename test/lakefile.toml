@@ -1,32 +1,18 @@
-name = "markdown"
-version = "0.3.0"
-defaultTargets = ["CommonMark", "GFMarkdown"]
+name = "test"
+defaultTargets = ["TestData"]
 testDriver = "TestData"
+
+[[require]]
+name = "markdown"
+path = ".."
 
 [[require]]
 name = "plausible"
 git = "https://github.com/leanprover-community/plausible"
 rev = "v4.32.0"
 
-[[require]]
-name = "html"
-git = "https://github.com/paulbutcher/lean-html"
-rev = "v0.5.0"
-
-[[require]]
-name = "UnicodeBasic"
-git = "https://github.com/fgdorais/lean4-unicode-basic.git"
-rev = "57acd424561ba8179487c4196a2a49a4775a333a"
-
-[[lean_lib]]
-name = "CommonMark"
-
-[[lean_lib]]
-name = "GFMarkdown"
-
 [[lean_lib]]
 name = "TestData"
-srcDir = "test"
 globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
   "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties",
   "GfmHtmlWellFormedness", "SanitizeSafety", "GfmSanitizeSafety", "SanitizeExamples",

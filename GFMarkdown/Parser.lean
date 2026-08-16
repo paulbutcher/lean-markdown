@@ -38,10 +38,8 @@ def taskListChecked (content : List RawBlock) : Option Bool × List RawBlock :=
 
 -- Mirrors `CommonMark.Parser.rawBlockToBlockF`/`groupAndConvertF`'s mutual, fuel-bounded
 -- recursion (see the comment there for why fuel is needed instead of structural recursion).
--- Fully independent from that conversion now (Phase 1 delegated the non-recursive cases to
--- it), rather than a partial mirror: once `paragraph`/`heading` need `RawInline`-typed
--- content of their own (to carry a `strikethrough`, which `CommonMark.Inline` never does),
--- there's nothing left to usefully delegate.
+-- Nothing is delegated to that conversion: `paragraph`/`heading` need `RawInline`-typed
+-- content of their own here, to carry a `strikethrough`, which `CommonMark.Inline` never does.
 mutual
 def rawBlockToBlockGfmF (defs : LinkDefs) : Nat → RawBlock → GFMarkdown.Block
   | 0, _ => .paragraph []

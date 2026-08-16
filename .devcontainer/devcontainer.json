@@ -12,8 +12,6 @@
     "PGHOST": "host.docker.internal"
   },
 
-  "postCreateCommand": "claude mcp add lean-lsp uvx lean-lsp-mcp --scope user",
-
 	"customizations": {
 		"vscode": {
 			"extensions": ["leanprover.lean4", "anthropic.claude-code"]
