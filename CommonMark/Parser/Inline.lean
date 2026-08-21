@@ -1,8 +1,12 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
-import CommonMark.Parser.Entities
-import UnicodeBasic
+module
+
+public import CommonMark.Ast
+public import CommonMark.Parser.Entities
+public import UnicodeBasic
+
+@[expose] public section
 
 namespace CommonMark.Parser
 

@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
+module
+
+public import CommonMark.Ast
+
+@[expose] public section
 
 -- Document/Block/Inline is not a single homogeneous rose tree (Block has three different
 -- shapes of children: List Block for block quotes, List (List Block) for list items,

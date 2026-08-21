@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
+module
+
+public import CommonMark
+
+@[expose] public section
 
 -- `renderHtml` builds its entire output through `Html.Node`'s typed constructors except
 -- for `.htmlInline`/`.htmlBlock`, which use `Html.Node.unsafeRaw` to pass literal HTML from
@@ -192,7 +196,7 @@ theorem renderBlockNodesF_wellFormed :
     split
     · intro n hn
       obtain ⟨n', hn', hneq⟩ := List.mem_map.mp hn
-      exact hneq ▸ inlineListNodes_wellFormed content h n' hn'
+      exact hneq ▸ Node.toFlow_wellFormed (inlineListNodes_wellFormed content h n' hn')
     · intro n hn
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hn
       rcases hn with hn | hn

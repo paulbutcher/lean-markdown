@@ -1,7 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
-import CommonMark.Parser.Inline
+module
+
+public import CommonMark.Ast
+public import CommonMark.Parser.Inline
+
+@[expose] public section
 
 namespace CommonMark.Parser
 

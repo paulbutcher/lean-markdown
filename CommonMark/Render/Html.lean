@@ -1,7 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
-import Html
+module
+
+public import CommonMark.Ast
+public import Html
+
+@[expose] public section
 
 namespace CommonMark
 
@@ -50,6 +54,7 @@ private def percentEncodeUriF : Nat → List Char → String
     if isUriSafeChar c then c.toString ++ percentEncodeUriF fuel rest
     else (utf8Bytes c).foldl (fun acc b => acc ++ byteToPercent b) "" ++ percentEncodeUriF fuel rest
 
+@[no_expose]
 def percentEncodeUri (s : String) : String :=
   percentEncodeUriF (s.length + 1) s.toList
 

@@ -1,6 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
+module
+
+public import CommonMark
+meta import CommonMark
+
+@[expose] public section
 
 -- Regression coverage for numeric character references invalid enough to require the
 -- REPLACEMENT CHARACTER (U+FFFD) but not exercised by the vendored spec suite: lone UTF-16

@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown
+module
+
+public import GFMarkdown
+
+@[expose] public section
 
 -- As `checkExample` (`CheckExample.lean`), but against the GFM entry points.
 def checkExampleGfm (exampleNum : Nat) (sectionName markdown expected : String) : Bool :=

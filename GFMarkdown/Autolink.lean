@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
+module
+
+public import GFMarkdown.Ast
+
+@[expose] public section
 
 -- GFM's "extended autolinks": bare `http://`/`https://`/`ftp://`/`www.` URLs and bare/
 -- `mailto:`/`xmpp:` email addresses, recognized in ordinary text without CommonMark's
@@ -81,6 +85,7 @@ private def autolinkDelimGo : Nat → List Char → Nat → Nat → List Char
 -- doesn't get swept in). `chars` is a tentative match already extended to the first
 -- whitespace/`<`; also re-truncates at an embedded `<` for parity with the source, though the
 -- callers below never actually produce one.
+@[no_expose]
 def autolinkDelim (chars : List Char) : List Char :=
   let truncated := chars.takeWhile (· ≠ '<')
   let (opening, closing) := parenCounts truncated
@@ -91,6 +96,7 @@ private def extendToBoundary (chars : List Char) : List Char :=
 
 -- `www.`-prefixed bare links: only recognized when immediately preceded by whitespace, one of
 -- `*_~(`, or nothing (start of the run) -- otherwise `xwww.foo.com` would wrongly linkify.
+@[no_expose]
 def matchWww (prev : Option Char) (chars : List Char) : Option (List Char) :=
   let boundaryOk := match prev with
     | none => true
@@ -133,6 +139,7 @@ private def matchSchemeWith (schemeText : List Char) (chars : List Char) : Optio
 -- inline node (e.g. straddling a backslash escape or an entity reference) -- not exercised by
 -- the vendored example suite, and an acceptable gap for the same reason `checkDomainGo` skips
 -- escaped-character handling.
+@[no_expose]
 def matchScheme (prev : Option Char) (chars : List Char) : Option (List Char) :=
   if (match prev with | none => false | some c => c.isAlpha) then none
   else
@@ -146,6 +153,7 @@ def matchScheme (prev : Option Char) (chars : List Char) : Option (List Char) :=
 private def flushText (pendingRev : List Char) (tail : List RawInline) : List RawInline :=
   if pendingRev.isEmpty then tail else .text (String.ofList pendingRev.reverse) :: tail
 
+@[no_expose]
 def scanUrlWwwGo : Nat → Option Char → List Char → List Char → List RawInline
   | 0, _, pending, _ => flushText pending []
   | _ + 1, _, pending, [] => flushText pending []
@@ -196,6 +204,7 @@ private def matchProtocolBefore (chars : Array Char) (windowStart colonIdx : Nat
 -- continues *past* it too -- letters of "mailto"/"xmpp" are alnum, so they're naturally
 -- consumed one at a time by the same rule on the next steps). Bounded by `windowStart`: never
 -- rewinds into text already spoken for by an earlier match (or before the start of the run).
+@[no_expose]
 def rewindEmailLocal : Nat → Array Char → Nat → Nat → Nat → Bool → Bool → Nat × Bool × Bool
   | 0, _, _, _, rewindLen, isXmpp, autoMailto => (rewindLen, isXmpp, autoMailto)
   | fuel + 1, chars, windowStart, atIdx, rewindLen, isXmpp, autoMailto =>
@@ -215,6 +224,7 @@ def rewindEmailLocal : Nat → Array Char → Nat → Nat → Nat → Bool → B
 -- inside an `xmpp:` address, for its optional resource part), or a `.` that's itself followed
 -- by another alnum char (an internal, "real" dot -- `np` counts these; a trailing or doubled
 -- dot isn't one, and ends the scan instead).
+@[no_expose]
 def scanEmailDomainGo : Nat → Array Char → Nat → Bool → Nat → Nat → Nat × Nat
   | 0, _, _, _, linkEnd, np => (linkEnd, np)
   | fuel + 1, chars, atIdx, isXmpp, linkEnd, np =>
@@ -235,6 +245,7 @@ def scanEmailDomainGo : Nat → Array Char → Nat → Bool → Nat → Nat → 
 -- a link either way, the only way this could observably differ is an `@`-heavy adversarial
 -- input finding a *different* (but still spec-shaped) match than cmark-gfm would; not
 -- exercised by the vendored example suite.
+@[no_expose]
 def tryEmailAt (chars : Array Char) (windowStart atIdx : Nat) : Option (Nat × Nat × String) :=
   let (rewindLen, isXmpp, autoMailto) :=
     rewindEmailLocal (atIdx - windowStart + 1) chars windowStart atIdx 0 false true

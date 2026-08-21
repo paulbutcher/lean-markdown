@@ -2,13 +2,13 @@ import Lake
 open Lake DSL
 
 package markdown where
-  version := v!"0.4.0"
+  version := v!"0.5.0"
 
-require html from git "https://github.com/paulbutcher/lean-html" @ "v0.5.0"
+require html from git "https://github.com/paulbutcher/lean-html" @ "v0.8.0"
 
 require UnicodeBasic from git
   "https://github.com/fgdorais/lean4-unicode-basic.git" @
-  "57acd424561ba8179487c4196a2a49a4775a333a"
+  "bbb75c5c9b7f30d5e397f27bd099655aed7db410"
 
 @[default_target]
 lean_lib CommonMark

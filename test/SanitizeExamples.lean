@@ -1,8 +1,15 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
-import GFMarkdown
-import Plausible
+module
+
+public import CommonMark
+public import GFMarkdown
+public import Plausible
+meta import CommonMark
+meta import GFMarkdown
+meta import Plausible
+
+@[expose] public section
 
 -- `SanitizeSafety.lean`/`GfmSanitizeSafety.lean` prove `Document.sanitize`'s two properties
 -- formally; these are a behavioral safety net on top, through the public

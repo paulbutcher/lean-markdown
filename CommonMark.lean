@@ -1,12 +1,14 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
-import CommonMark.Parser.Entities
-import CommonMark.Parser.Block
-import CommonMark.Parser.Inline
-import CommonMark.Render.Html
-import CommonMark.Sanitize
-import CommonMark.Zipper
+module
+
+public import CommonMark.Ast
+public import CommonMark.Parser.Entities
+public import CommonMark.Parser.Block
+public import CommonMark.Parser.Inline
+public import CommonMark.Render.Html
+public import CommonMark.Sanitize
+public import CommonMark.Zipper
 
 /-! A CommonMark 0.31.2 parser and HTML renderer.
 

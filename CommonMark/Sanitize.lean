@@ -1,7 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark.Ast
-import CommonMark.Render.Html
+module
+
+public import CommonMark.Ast
+public import CommonMark.Render.Html
+
+@[expose] public section
 
 -- `renderHtml`'s own safety guarantee stops at the document's structure: escaping is proved
 -- for every ordinary leaf, but `.htmlInline`/`.htmlBlock` are raw HTML from the Markdown
@@ -15,22 +19,22 @@ import CommonMark.Render.Html
 
 namespace CommonMark
 
-private def isSchemeStartChar (c : Char) : Bool := c.isAlpha
-private def isSchemeChar (c : Char) : Bool := c.isAlphanum || c == '+' || c == '-' || c == '.'
+def isSchemeStartChar (c : Char) : Bool := c.isAlpha
+def isSchemeChar (c : Char) : Bool := c.isAlphanum || c == '+' || c == '-' || c == '.'
 
 -- Characters with no legitimate role in a URI scheme; stripped before scanning so an embedded
 -- control character (e.g. a tab in `java\tscript:`) can't hide a scheme from detection the
 -- way it can hide one from a naive regex.
-private def isUriControlChar (c : Char) : Bool := c.toNat < 0x20 || c.toNat == 0x7F
+def isUriControlChar (c : Char) : Bool := c.toNat < 0x20 || c.toNat == 0x7F
 
-private def stripControlChars (s : String) : String :=
+def stripControlChars (s : String) : String :=
   String.ofList (s.toList.filter (fun c => !isUriControlChar c))
 
 -- The leading URI scheme (RFC 3986: `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )` followed by
 -- `:`), if `s` has one. A destination with no such prefix is a relative reference (a path,
 -- fragment, or query), which is always safe: only an explicit scheme can name `javascript:`,
 -- `data:`, etc.
-private def extractScheme (s : String) : Option String :=
+def extractScheme (s : String) : Option String :=
   match s.toList with
   | c :: rest =>
     if isSchemeStartChar c then

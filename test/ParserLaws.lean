@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
+module
+
+public import CommonMark
+
+@[expose] public section
 
 -- Algebraic properties of parser building blocks, proven here since nothing in the
 -- library depends on them.

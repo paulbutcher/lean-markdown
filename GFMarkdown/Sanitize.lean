@@ -1,8 +1,12 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
-import GFMarkdown.Render.Html
-import CommonMark.Sanitize
+module
+
+public import GFMarkdown.Ast
+public import GFMarkdown.Render.Html
+public import CommonMark.Sanitize
+
+@[expose] public section
 
 -- Mirrors `CommonMark.Sanitize`'s `Document.sanitize`/`renderHtmlSafe` for the GFM variant:
 -- see that module's docs for why `renderHtml` alone isn't safe on untrusted input. Written as

@@ -1,7 +1,13 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
-import Plausible
+module
+
+public import CommonMark
+public import Plausible
+meta import CommonMark
+meta import Plausible
+
+@[expose] public section
 
 -- `RawBlock.table`'s fallback arm in `CommonMark.Parser.rawBlockToBlockF` and
 -- `narrowInline`'s `.strikethrough` fallback arm in `CommonMark.Parser.narrowInline`

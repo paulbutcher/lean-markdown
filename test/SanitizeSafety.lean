@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
+module
+
+public import CommonMark
+
+@[expose] public section
 
 -- `Document.sanitize` (`CommonMark.Sanitize`) is meant to make `renderHtmlSafe`'s output safe
 -- to serve from untrusted Markdown source: no embedded raw HTML, and no link/image `dest`

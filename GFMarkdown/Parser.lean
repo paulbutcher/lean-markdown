@@ -1,8 +1,12 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
-import GFMarkdown.Autolink
-import GFMarkdown.TagFilter
+module
+
+public import GFMarkdown.Ast
+public import GFMarkdown.Autolink
+public import GFMarkdown.TagFilter
+
+@[expose] public section
 
 namespace GFMarkdown.Parser
 

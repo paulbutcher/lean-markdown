@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
+module
+
+public import GFMarkdown.Ast
+
+@[expose] public section
 
 -- GFM's raw-HTML "tag filter" extension: neuters a fixed list of tags (`title`, `textarea`,
 -- `style`, `xmp`, `iframe`, `noembed`, `noframes`, `script`, `plaintext`) wherever they appear
@@ -49,6 +53,7 @@ private def filterHtmlGo : Nat → List Char → List Char
 
 -- Mirrors cmark-gfm's `filter_html_block`/inline filtering: scans for every `<` in `s`, and
 -- replaces just the ones that open/close a blacklisted tag.
+@[no_expose]
 def filterHtml (s : String) : String :=
   String.ofList (filterHtmlGo (s.length + 1) s.toList)
 

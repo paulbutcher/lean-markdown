@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.0] - 2026-08-21
+
+Move to Lean's module system.
+
 ## [0.4.0] - 2026-08-16
 
 Tidying up and restructuring

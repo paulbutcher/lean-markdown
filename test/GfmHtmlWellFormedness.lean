@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown
+module
+
+public import GFMarkdown
+
+@[expose] public section
 
 -- Mirrors `HtmlWellFormedness.lean`'s structure exactly, adapted to `GFMarkdown`'s own
 -- (structurally similar but independent) `Block`/`RawInline`/renderer: `renderHtml` builds
@@ -161,7 +165,7 @@ private theorem checkboxNodes_wellFormed (checked : Option Bool) :
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
     rcases hc with hc | hc
     · subst hc
-      exact Node.voidElement_wellFormed .phrasing "input" _
+      exact Node.toFlow_wellFormed (Node.voidElement_wellFormed .phrasing "input" _)
     · subst hc; exact Node.text_wellFormed " "
 
 -- Mirrors `CommonMark.inlineNodes_wellFormed`/`inlineListNodes_wellFormed`'s own mutual
@@ -225,7 +229,7 @@ private theorem tableCellNode_wellFormed (isHeader : Bool) (alignment : CommonMa
       (fun (n : Node .phrasing) => (n : Node .flow)), Node.WellFormed c := by
     intro c hc
     obtain ⟨n, hn, hneq⟩ := List.mem_map.mp hc
-    exact hneq ▸ inlineListNodes_wellFormed content h n hn
+    exact hneq ▸ Node.toFlow_wellFormed (inlineListNodes_wellFormed content h n hn)
   split
   · exact Node.elementOf_wellFormed .tableCell .flow "th" _ _ hchildren
   · exact Node.elementOf_wellFormed .tableCell .flow "td" _ _ hchildren
@@ -300,7 +304,7 @@ theorem renderBlockNodesF_wellFormed :
     split
     · intro n hn
       obtain ⟨n', hn', hneq⟩ := List.mem_map.mp hn
-      exact hneq ▸ inlineListNodes_wellFormed content h n' hn'
+      exact hneq ▸ Node.toFlow_wellFormed (inlineListNodes_wellFormed content h n' hn')
     · intro n hn
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hn
       rcases hn with hn | hn

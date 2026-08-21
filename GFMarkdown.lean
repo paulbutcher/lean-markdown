@@ -1,9 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
-import GFMarkdown.Parser
-import GFMarkdown.Render.Html
-import GFMarkdown.Sanitize
+module
+
+public import GFMarkdown.Ast
+public import GFMarkdown.Parser
+public import GFMarkdown.Render.Html
+public import GFMarkdown.Sanitize
 
 /-! A GitHub Flavored Markdown (GFM) parser and renderer, built on top of `CommonMark`.
 

@@ -1,8 +1,12 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown.Ast
-import CommonMark.Render.Html
-import Html
+module
+
+public import GFMarkdown.Ast
+public import CommonMark.Render.Html
+public import Html
+
+@[expose] public section
 
 namespace GFMarkdown
 
@@ -66,7 +70,7 @@ def interleaveNewlines {cat : Html.Category} (nodes : List (Html.Node cat)) :
     List (Html.Node cat) :=
   nodes.foldr (fun n acc => ("\n" : Html.Node cat) :: n :: acc) [("\n" : Html.Node cat)]
 
-private def tableCellAlignAttrs : TableAlignment → List (String × String)
+def tableCellAlignAttrs : TableAlignment → List (String × String)
   | .left => [("align", "left")]
   | .right => [("align", "right")]
   | .center => [("align", "center")]

@@ -7,7 +7,12 @@
 -- generated range rather than left in to fail; example 20 is handled separately just below,
 -- since its expected output is cmark-gfm's own "<IGNORE>" marker (checked for not crashing,
 -- not for an exact match).
-import CheckExampleGfm
+module
+
+public import CheckExampleGfm
+meta import CheckExampleGfm
+
+@[expose] public section
 
 #guard checkExampleGfm 1 "Tables" "| abc | def |\n| --- | --- |\n| ghi | jkl |\n| mno | pqr |\n" "<table>\n<thead>\n<tr>\n<th>abc</th>\n<th>def</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>ghi</td>\n<td>jkl</td>\n</tr>\n<tr>\n<td>mno</td>\n<td>pqr</td>\n</tr>\n</tbody>\n</table>\n"
 #guard checkExampleGfm 2 "Tables" "Hello!\n\n| _abc_ | セン |\n| ----- | ---- |\n| 1. Block elements inside cells don't work. | |\n| But _**inline elements do**_. | x |\n\nHi!\n" "<p>Hello!</p>\n<table>\n<thead>\n<tr>\n<th><em>abc</em></th>\n<th>セン</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>1. Block elements inside cells don't work.</td>\n<td></td>\n</tr>\n<tr>\n<td>But <em><strong>inline elements do</strong></em>.</td>\n<td>x</td>\n</tr>\n</tbody>\n</table>\n<p>Hi!</p>\n"

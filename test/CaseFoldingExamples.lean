@@ -1,6 +1,11 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import CommonMark
+module
+
+public import CommonMark
+meta import CommonMark
+
+@[expose] public section
 
 -- Regression coverage for a full-Unicode-case-fold exception not exercised by the vendored
 -- spec suite: İ (U+0130, LATIN CAPITAL LETTER I WITH DOT ABOVE) folds to two characters, "i"

@@ -1,6 +1,10 @@
 -- Copyright (c) 2026 Paul Butcher. All rights reserved.
 -- Released under Apache 2.0 license as described in the file LICENSE.
-import GFMarkdown
+module
+
+public import GFMarkdown
+
+@[expose] public section
 
 -- Mirrors `SanitizeSafety.lean`'s structure and goal, adapted to `GFMarkdown.Sanitize`'s own
 -- (structurally similar but independent, and self-fuel-matching rather than going through a
