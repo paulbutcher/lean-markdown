@@ -725,7 +725,7 @@ def tryOpenTableFromParagraph (st : State) (delimiterLine : String) : Option Sta
       | _, _ => none
   | _ => none
 
-def processLine (gfmTables : Bool) (st : State) (line : String) : State :=
+def processLine (opts : Options) (st : State) (line : String) : State :=
   let (m, remainder) := matchContainers st.frames line
   let n := st.frames.size
   if m == n then
@@ -768,7 +768,7 @@ def processLine (gfmTables : Bool) (st : State) (line : String) : State :=
           if startsNewBlock true remainder then
             startBlockFrom st.closeLeaf remainder none
           else
-            match (if gfmTables then tryOpenTableFromParagraph st remainder else none) with
+            match (if opts.gfmTables then tryOpenTableFromParagraph st remainder else none) with
             | some st' => st'
             | none => st.appendParagraphLine (stripLeadingWs remainder)
     | .table header alignments rows =>
@@ -808,8 +808,8 @@ def processLine (gfmTables : Bool) (st : State) (line : String) : State :=
       if isBlank remainder then st2.markPendingBlank
       else startBlockFrom st2 remainder carry
 
-def runLines (gfmTables : Bool) (lines : List String) : State :=
-  lines.foldl (processLine gfmTables) initialState
+def runLines (opts : Options) (lines : List String) : State :=
+  lines.foldl (processLine opts) initialState
 
 def finalizeState (st : State) : List RawBlock × LinkDefs :=
   let st1 := st.closeLeaf
@@ -862,33 +862,33 @@ end
 -- termination checker, so recursion is instead driven by an explicit fuel value (bounded
 -- by the total node count, which is always enough since no subtree exceeds the whole tree).
 mutual
-def rawBlockToBlockF (defs : LinkDefs) : Nat → RawBlock → CommonMark.Block
+def rawBlockToBlockF (opts : Options) (defs : LinkDefs) : Nat → RawBlock → CommonMark.Block
   | 0, _ => .paragraph []
-  | _ + 1, .paragraph text => .paragraph (parseInline defs text)
-  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInline defs text)
+  | _ + 1, .paragraph text => .paragraph (parseInline opts defs text)
+  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInline opts defs text)
   | _ + 1, .codeBlock info lit => .codeBlock info lit
   | _ + 1, .thematicBreak => .thematicBreak
   | _ + 1, .htmlBlock s => .htmlBlock s
-  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF defs fuel content)
-  | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF defs fuel content]
-  -- Only ever produced when `gfmTables = true`; on the plain CommonMark path this arm is
+  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertF opts defs fuel content)
+  | fuel + 1, .listItem kind _ content => .list kind false [groupAndConvertF opts defs fuel content]
+  -- Only ever produced when `opts.gfmTables` is set; on the plain CommonMark path this arm is
   -- unreachable, but the match still has to be total over all of `RawBlock`.
   | _ + 1, .table _ _ _ => .paragraph []
 
-def groupAndConvertF (defs : LinkDefs) : Nat → List RawBlock → List CommonMark.Block
+def groupAndConvertF (opts : Options) (defs : LinkDefs) : Nat → List RawBlock → List CommonMark.Block
   | 0, _ => []
   | _ + 1, [] => []
   | fuel + 1, .listItem kind loose content :: rest =>
     let (siblings, rest') := takeSameKindItems kind rest
     let allItems := (kind, loose, content) :: siblings
     let looseOverall := allItems.any (fun (_, l, _) => l)
-    let items := allItems.map (fun (_, _, c) => groupAndConvertF defs fuel c)
-    .list kind (!looseOverall) items :: groupAndConvertF defs fuel rest'
-  | fuel + 1, b :: rest => rawBlockToBlockF defs fuel b :: groupAndConvertF defs fuel rest
+    let items := allItems.map (fun (_, _, c) => groupAndConvertF opts defs fuel c)
+    .list kind (!looseOverall) items :: groupAndConvertF opts defs fuel rest'
+  | fuel + 1, b :: rest => rawBlockToBlockF opts defs fuel b :: groupAndConvertF opts defs fuel rest
 end
 
-def groupAndConvert (defs : LinkDefs) (blocks : List RawBlock) : List CommonMark.Block :=
-  groupAndConvertF defs (rawBlockListCount blocks + 1) blocks
+def groupAndConvert (opts : Options) (defs : LinkDefs) (blocks : List RawBlock) : List CommonMark.Block :=
+  groupAndConvertF opts defs (rawBlockListCount blocks + 1) blocks
 
 end CommonMark.Parser
 
@@ -899,7 +899,7 @@ namespace CommonMark
     looping. Matches the official example suite exactly (see the `#guard` checks in
     `test/SpecGuards.lean`). -/
 def parseDocument (s : String) : Document :=
-  let (blocks, defs) := Parser.finalizeState (Parser.runLines false (Parser.splitLines s))
-  Parser.groupAndConvert defs blocks
+  let (blocks, defs) := Parser.finalizeState (Parser.runLines {} (Parser.splitLines s))
+  Parser.groupAndConvert {} defs blocks
 
 end CommonMark

@@ -25,7 +25,7 @@ def Inline.noEmbeddedHtml : Inline → Bool
   | .strong content => Inline.noEmbeddedHtmlList content
   | .link _ _ content => Inline.noEmbeddedHtmlList content
   | .image _ _ content => Inline.noEmbeddedHtmlList content
-  | .text _ | .code _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
 
 def Inline.noEmbeddedHtmlList : List Inline → Bool
   | [] => true
@@ -38,7 +38,7 @@ def Inline.allDestsSafe : Inline → Bool
   | .image dest _ content => isSafeUriScheme dest && Inline.allDestsSafeList content
   | .emph content => Inline.allDestsSafeList content
   | .strong content => Inline.allDestsSafeList content
-  | .text _ | .code _ | .htmlInline _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .htmlInline _ | .softBreak | .lineBreak => true
 
 def Inline.allDestsSafeList : List Inline → Bool
   | [] => true
@@ -100,6 +100,8 @@ theorem sanitizeInline_ok : (i : Inline) →
   | .softBreak => by
     simp [Inline.map, sanitizeInline, Inline.noEmbeddedHtml, Inline.allDestsSafe]
   | .lineBreak => by
+    simp [Inline.map, sanitizeInline, Inline.noEmbeddedHtml, Inline.allDestsSafe]
+  | .math .. => by
     simp [Inline.map, sanitizeInline, Inline.noEmbeddedHtml, Inline.allDestsSafe]
   | .emph content => by
     simp only [Inline.map, sanitizeInline, Inline.noEmbeddedHtml, Inline.allDestsSafe]

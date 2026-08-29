@@ -23,7 +23,7 @@ def RawInline.noHtml : RawInline → Bool
   | .link _ _ content => RawInline.noHtmlList content
   | .image _ _ content => RawInline.noHtmlList content
   | .strikethrough content => RawInline.noHtmlList content
-  | .text _ | .code _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
 
 def RawInline.noHtmlList : List RawInline → Bool
   | [] => true
@@ -208,6 +208,11 @@ theorem inlineNodes_wellFormed :
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     simp only [RawInline.noHtml] at h
     exact Node.element_wellFormed .phrasing "del" _ _ (inlineListNodes_wellFormed content h)
+  | .math .., _ => by
+    intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
+    exact Node.element_wellFormed .phrasing "span" _ _ (by
+      intro c hc; simp only [List.mem_singleton] at hc; subst hc
+      split <;> exact Node.text_wellFormed _)
 
 theorem inlineListNodes_wellFormed :
     (l : List RawInline) → RawInline.noHtmlList l = true → ∀ n ∈ inlineListNodes l, Node.WellFormed n

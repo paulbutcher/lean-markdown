@@ -7,8 +7,10 @@ module
 namespace CommonMark
 
 /-- Inline-level content: the children of a paragraph, heading, or another inline node.
-    `text`/`code`/`htmlInline`/`softBreak`/`lineBreak` are leaves; the rest carry nested
-    content. -/
+    `text`/`code`/`math`/`htmlInline`/`softBreak`/`lineBreak` are leaves; the rest carry nested
+    content. `math`'s `display` distinguishes `$$`-delimited from `$`-delimited spans, and its
+    `s` is the LaTeX source verbatim; it only ever appears when the math extension is enabled
+    (`CommonMark.Parser.Options.math`). -/
 inductive Inline where
   | text       (s : String)
   | code       (s : String)
@@ -19,6 +21,7 @@ inductive Inline where
   | htmlInline (s : String)
   | softBreak
   | lineBreak
+  | math       (display : Bool) (s : String)
   deriving Repr, BEq
 
 /-- A list's marker style: `bullet` for `-`/`*`/`+` lists, `ordered` for `1.`/`1)` lists

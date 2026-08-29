@@ -23,7 +23,7 @@ def RawInline.noEmbeddedHtml : RawInline → Bool
   | .link _ _ content => RawInline.noEmbeddedHtmlList content
   | .image _ _ content => RawInline.noEmbeddedHtmlList content
   | .strikethrough content => RawInline.noEmbeddedHtmlList content
-  | .text _ | .code _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
 
 def RawInline.noEmbeddedHtmlList : List RawInline → Bool
   | [] => true
@@ -37,7 +37,7 @@ def RawInline.allDestsSafe : RawInline → Bool
   | .emph content => RawInline.allDestsSafeList content
   | .strong content => RawInline.allDestsSafeList content
   | .strikethrough content => RawInline.allDestsSafeList content
-  | .text _ | .code _ | .htmlInline _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .htmlInline _ | .softBreak | .lineBreak => true
 
 def RawInline.allDestsSafeList : List RawInline → Bool
   | [] => true
@@ -105,6 +105,7 @@ theorem sanitizeInline_ok : (i : RawInline) →
   | .htmlInline _ => by simp [sanitizeInline, RawInline.noEmbeddedHtml, RawInline.allDestsSafe]
   | .softBreak => by simp [sanitizeInline, RawInline.noEmbeddedHtml, RawInline.allDestsSafe]
   | .lineBreak => by simp [sanitizeInline, RawInline.noEmbeddedHtml, RawInline.allDestsSafe]
+  | .math .. => by simp [sanitizeInline, RawInline.noEmbeddedHtml, RawInline.allDestsSafe]
   | .emph content => by
     simp only [sanitizeInline, RawInline.noEmbeddedHtml, RawInline.allDestsSafe]
     exact sanitizeInlineList_ok content

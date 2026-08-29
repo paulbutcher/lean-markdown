@@ -10,8 +10,12 @@ public import GFMarkdown.TagFilter
 
 namespace GFMarkdown.Parser
 
-open CommonMark.Parser (RawBlock LinkDefs parseInlineRaw takeSameKindItems rawBlockListCount
+open CommonMark.Parser (RawBlock LinkDefs Options parseInlineRaw takeSameKindItems rawBlockListCount
   headingLevelToFin)
+
+/-- The extension set GFM adds on top of CommonMark. `math` stays off: it is orthogonal to
+    GFM, and callers opt into it separately. -/
+def options : Options := { gfmTables := true, gfmStrikethrough := true }
 
 -- GFM's task-list-item marker: `[ ]`/`[x]`/`[X]` followed by at least one space or tab,
 -- recognized only as the very first three-plus characters of a list item's raw text (before
@@ -45,21 +49,21 @@ def taskListChecked (content : List RawBlock) : Option Bool × List RawBlock :=
 -- Nothing is delegated to that conversion: `paragraph`/`heading` need `RawInline`-typed
 -- content of their own here, to carry a `strikethrough`, which `CommonMark.Inline` never does.
 mutual
-def rawBlockToBlockGfmF (defs : LinkDefs) : Nat → RawBlock → GFMarkdown.Block
+def rawBlockToBlockGfmF (opts : Options) (defs : LinkDefs) : Nat → RawBlock → GFMarkdown.Block
   | 0, _ => .paragraph []
-  | _ + 1, .paragraph text => .paragraph (parseInlineRaw true defs text)
-  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInlineRaw true defs text)
+  | _ + 1, .paragraph text => .paragraph (parseInlineRaw opts defs text)
+  | _ + 1, .heading level text => .heading (headingLevelToFin level) (parseInlineRaw opts defs text)
   | _ + 1, .codeBlock info lit => .codeBlock info lit
   | _ + 1, .thematicBreak => .thematicBreak
   | _ + 1, .htmlBlock s => .htmlBlock s
-  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertGfmF defs fuel content)
+  | fuel + 1, .blockQuote content => .blockQuote (groupAndConvertGfmF opts defs fuel content)
   | fuel + 1, .listItem kind _ content =>
-    .list kind false [(none, groupAndConvertGfmF defs fuel content)]
+    .list kind false [(none, groupAndConvertGfmF opts defs fuel content)]
   | _ + 1, .table header alignments rows =>
-    .table (header.map (parseInlineRaw true defs)) alignments
-      (rows.map (List.map (parseInlineRaw true defs)))
+    .table (header.map (parseInlineRaw opts defs)) alignments
+      (rows.map (List.map (parseInlineRaw opts defs)))
 
-def groupAndConvertGfmF (defs : LinkDefs) : Nat → List RawBlock → List GFMarkdown.Block
+def groupAndConvertGfmF (opts : Options) (defs : LinkDefs) : Nat → List RawBlock → List GFMarkdown.Block
   | 0, _ => []
   | _ + 1, [] => []
   | fuel + 1, .listItem kind loose content :: rest =>
@@ -68,13 +72,13 @@ def groupAndConvertGfmF (defs : LinkDefs) : Nat → List RawBlock → List GFMar
     let looseOverall := allItems.any (fun (_, l, _) => l)
     let items := allItems.map (fun (_, _, c) =>
       let (checked, c') := taskListChecked c
-      (checked, groupAndConvertGfmF defs fuel c'))
-    .list kind (!looseOverall) items :: groupAndConvertGfmF defs fuel rest'
-  | fuel + 1, b :: rest => rawBlockToBlockGfmF defs fuel b :: groupAndConvertGfmF defs fuel rest
+      (checked, groupAndConvertGfmF opts defs fuel c'))
+    .list kind (!looseOverall) items :: groupAndConvertGfmF opts defs fuel rest'
+  | fuel + 1, b :: rest => rawBlockToBlockGfmF opts defs fuel b :: groupAndConvertGfmF opts defs fuel rest
 end
 
-def groupAndConvertGfm (defs : LinkDefs) (blocks : List RawBlock) : List GFMarkdown.Block :=
-  groupAndConvertGfmF defs (rawBlockListCount blocks + 1) blocks
+def groupAndConvertGfm (opts : Options) (defs : LinkDefs) (blocks : List RawBlock) : List GFMarkdown.Block :=
+  groupAndConvertGfmF opts defs (rawBlockListCount blocks + 1) blocks
 
 end GFMarkdown.Parser
 
@@ -86,7 +90,7 @@ namespace GFMarkdown
     and the raw-HTML tag filter. -/
 def parseDocument (s : String) : Document :=
   let (blocks, defs) :=
-    CommonMark.Parser.finalizeState (CommonMark.Parser.runLines true (CommonMark.Parser.splitLines s))
-  tagFilterDocument (autolinkDocument (Parser.groupAndConvertGfm defs blocks))
+    CommonMark.Parser.finalizeState (CommonMark.Parser.runLines Parser.options (CommonMark.Parser.splitLines s))
+  tagFilterDocument (autolinkDocument (Parser.groupAndConvertGfm Parser.options defs blocks))
 
 end GFMarkdown

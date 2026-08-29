@@ -12,6 +12,14 @@ namespace CommonMark.Parser
 
 abbrev LinkDefs := Array (String × String × Option String)
 
+/-- Which extensions the parser recognizes. Every field gates a construct that is otherwise
+    left as ordinary text, so the all-`false` default parses exactly CommonMark. -/
+structure Options where
+  math : Bool := false
+  gfmStrikethrough : Bool := false
+  gfmTables : Bool := false
+  deriving Repr, BEq, Inhabited
+
 def toLowerStr (s : String) : String :=
   String.ofList (s.toList.map Char.toLower)
 
@@ -64,12 +72,12 @@ def skipLeadingSpacesTabs : List Char → List Char
   | c :: rest => if c == ' ' || c == '\t' then skipLeadingSpacesTabs rest else c :: rest
   | [] => []
 
--- `gfmStrikethrough` only adds `~` to the trigger set; with it `false`, this is byte-for-byte
+-- `opts.gfmStrikethrough` only adds `~` to the trigger set; with it `false`, this is byte-for-byte
 -- what it was before `~` existed, so the plain (non-GFM) path's behavior is unchanged.
-def takePlainRun (gfmStrikethrough : Bool) (chars : List Char) : String × List Char :=
+def takePlainRun (opts : Options) (chars : List Char) : String × List Char :=
   let isTrigger (c : Char) : Bool :=
     c == '\\' || c == '`' || c == '&' || c == '<' || c == '[' || c == ']' ||
-    c == '!' || c == '*' || c == '_' || c == '\n' || (gfmStrikethrough && c == '~')
+    c == '!' || c == '*' || c == '_' || c == '\n' || (opts.gfmStrikethrough && c == '~')
   let plain := chars.takeWhile (fun c => !isTrigger c)
   (String.ofList plain, chars.drop plain.length)
 
@@ -550,7 +558,7 @@ def tryLinkTail (defs : LinkDefs) (linkTextChars : List Char) (afterBracket : Li
 
 /-- Mirrors `CommonMark.Inline` exactly, plus `strikethrough`, for the GFM variant's inline
     pipeline (the tokenizer/delimiter-stack machinery below is shared by both variants, gated
-    behind `gfmStrikethrough : Bool`; see `parseInline`/`parseInlineRaw`). Lives alongside
+    behind `Options.gfmStrikethrough`; see `parseInline`/`parseInlineRaw`). Lives alongside
     `INode` rather than in the `GFMarkdown` namespace for the same reason `RawBlock`/
     `TableAlignment` do: it's needed by machinery in `CommonMark.Parser`, which can't depend
     on `GFMarkdown`. -/
@@ -565,6 +573,7 @@ inductive RawInline where
   | softBreak
   | lineBreak
   | strikethrough (content : List RawInline)
+  | math          (display : Bool) (s : String)
   deriving Repr, BEq, Inhabited
 
 -- The tokenized form of an inline text run: characters that can never interact with later
@@ -588,17 +597,17 @@ inductive INode where
   | closeBracketFail
   deriving Inhabited
 
-def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
+def tokenizeF (defs : LinkDefs) (opts : Options) :
     Nat → List (Bool × List Char) → Option Char → List Char → List INode
   | 0, _, _, _ => []
   | _ + 1, _, _, [] => []
   | fuel + 1, stack, _, '\\' :: c :: rest =>
     if isEscapable c then
-      .text c.toString :: tokenizeF defs gfmStrikethrough fuel stack (some c) rest
+      .text c.toString :: tokenizeF defs opts fuel stack (some c) rest
     else if c == '\n' then
-      .resolved .lineBreak :: tokenizeF defs gfmStrikethrough fuel stack none (skipLeadingSpacesTabs rest)
+      .resolved .lineBreak :: tokenizeF defs opts fuel stack none (skipLeadingSpacesTabs rest)
     else
-      .text "\\" :: tokenizeF defs gfmStrikethrough fuel stack (some '\\') (c :: rest)
+      .text "\\" :: tokenizeF defs opts fuel stack (some '\\') (c :: rest)
   | _ + 1, _, _, '\\' :: [] => [.text "\\"]
   | fuel + 1, stack, _, '`' :: rest =>
     let openRun := ('`' :: rest).takeWhile (· == '`')
@@ -606,34 +615,34 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
     match findCodeSpanEnd openRun.length afterOpen with
     | some (content, after) =>
       .resolved (.code (normalizeCodeSpanContent content)) ::
-        tokenizeF defs gfmStrikethrough fuel stack (some '`') after
+        tokenizeF defs opts fuel stack (some '`') after
     | none =>
-      .text (String.ofList openRun) :: tokenizeF defs gfmStrikethrough fuel stack (some '`') afterOpen
+      .text (String.ofList openRun) :: tokenizeF defs opts fuel stack (some '`') afterOpen
   | fuel + 1, stack, _, '&' :: rest =>
     match parseEntityRef rest with
     | some (txt, after) =>
-      .text txt :: tokenizeF defs gfmStrikethrough fuel stack txt.toList.getLast? after
-    | none => .text "&" :: tokenizeF defs gfmStrikethrough fuel stack (some '&') rest
+      .text txt :: tokenizeF defs opts fuel stack txt.toList.getLast? after
+    | none => .text "&" :: tokenizeF defs opts fuel stack (some '&') rest
   | fuel + 1, stack, _, '<' :: rest =>
     match matchAutolink rest with
     | some (content, isEmail, after) =>
       let dest := if isEmail then "mailto:" ++ content else content
       .resolved (.link dest none [.text content]) ::
-        tokenizeF defs gfmStrikethrough fuel stack (some '>') after
+        tokenizeF defs opts fuel stack (some '>') after
     | none =>
       match matchInlineHtml rest with
       | some (raw, after) =>
-        .resolved (.htmlInline raw) :: tokenizeF defs gfmStrikethrough fuel stack raw.toList.getLast? after
-      | none => .text "<" :: tokenizeF defs gfmStrikethrough fuel stack (some '<') rest
+        .resolved (.htmlInline raw) :: tokenizeF defs opts fuel stack raw.toList.getLast? after
+      | none => .text "<" :: tokenizeF defs opts fuel stack (some '<') rest
   | fuel + 1, stack, _, '!' :: '[' :: rest =>
-    .openBracket true true :: tokenizeF defs gfmStrikethrough fuel ((true, rest) :: stack) (some '[') rest
+    .openBracket true true :: tokenizeF defs opts fuel ((true, rest) :: stack) (some '[') rest
   | fuel + 1, stack, _, '!' :: rest =>
-    .text "!" :: tokenizeF defs gfmStrikethrough fuel stack (some '!') rest
+    .text "!" :: tokenizeF defs opts fuel stack (some '!') rest
   | fuel + 1, stack, _, '[' :: rest =>
-    .openBracket false true :: tokenizeF defs gfmStrikethrough fuel ((false, rest) :: stack) (some '[') rest
+    .openBracket false true :: tokenizeF defs opts fuel ((false, rest) :: stack) (some '[') rest
   | fuel + 1, stack, _, ']' :: rest =>
     match stack with
-    | [] => .text "]" :: tokenizeF defs gfmStrikethrough fuel stack (some ']') rest
+    | [] => .text "]" :: tokenizeF defs opts fuel stack (some ']') rest
     | (isImage, startChars) :: restStack =>
       let labelChars := startChars.take (startChars.length - (rest.length + 1))
       match tryLinkTail defs labelChars rest with
@@ -642,10 +651,10 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
         let rawTailText := String.ofList (rest.take consumedLen)
         let prev' := if rawTailText.isEmpty then some ']' else rawTailText.toList.getLast?
         .closeBracket isImage dest title rawTailText ::
-          tokenizeF defs gfmStrikethrough fuel restStack prev' restAfterTail
-      | none => .closeBracketFail :: tokenizeF defs gfmStrikethrough fuel restStack (some ']') rest
+          tokenizeF defs opts fuel restStack prev' restAfterTail
+      | none => .closeBracketFail :: tokenizeF defs opts fuel restStack (some ']') rest
   | fuel + 1, stack, _, '\n' :: rest =>
-    .resolved .softBreak :: tokenizeF defs gfmStrikethrough fuel stack none (skipLeadingSpacesTabs rest)
+    .resolved .softBreak :: tokenizeF defs opts fuel stack none (skipLeadingSpacesTabs rest)
   | fuel + 1, stack, prev, c :: rest =>
     if c == '*' || c == '_' then
       let chars := c :: rest
@@ -653,8 +662,8 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
       let afterRun := chars.drop run.length
       let co := canOpenDelim c prev afterRun.head?
       let cc := canCloseDelim c prev afterRun.head?
-      .delim c run.length run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
-    else if gfmStrikethrough && c == '~' then
+      .delim c run.length run.length co cc :: tokenizeF defs opts fuel stack (some c) afterRun
+    else if opts.gfmStrikethrough && c == '~' then
       -- GFM only ever treats a run of exactly one or two tildes as an operable delimiter
       -- (`resolveEmphasis`'s tilde matching requires an exact-length pair besides); any other
       -- run length is never eligible, so it's just literal text from the start.
@@ -664,20 +673,20 @@ def tokenizeF (defs : LinkDefs) (gfmStrikethrough : Bool) :
       if run.length == 1 || run.length == 2 then
         let co := canOpenDelim c prev afterRun.head?
         let cc := canCloseDelim c prev afterRun.head?
-        .delim c run.length run.length co cc :: tokenizeF defs gfmStrikethrough fuel stack (some c) afterRun
+        .delim c run.length run.length co cc :: tokenizeF defs opts fuel stack (some c) afterRun
       else
-        .text (String.ofList run) :: tokenizeF defs gfmStrikethrough fuel stack run.getLast? afterRun
+        .text (String.ofList run) :: tokenizeF defs opts fuel stack run.getLast? afterRun
     else
-      let (plain, rest') := takePlainRun gfmStrikethrough (c :: rest)
+      let (plain, rest') := takePlainRun opts (c :: rest)
       match rest' with
       | '\n' :: afterNl =>
         let plainChars := plain.toList
         let trailingSpaces := (plainChars.reverse.takeWhile (· == ' ')).length
         let core := String.ofList (plainChars.reverse.drop trailingSpaces).reverse
         let brk : INode := .resolved (if trailingSpaces ≥ 2 then .lineBreak else .softBreak)
-        let afterBreak := tokenizeF defs gfmStrikethrough fuel stack none (skipLeadingSpacesTabs afterNl)
+        let afterBreak := tokenizeF defs opts fuel stack none (skipLeadingSpacesTabs afterNl)
         (if core.isEmpty then [] else [.text core]) ++ (brk :: afterBreak)
-      | _ => .text plain :: tokenizeF defs gfmStrikethrough fuel stack plain.toList.getLast? rest'
+      | _ => .text plain :: tokenizeF defs opts fuel stack plain.toList.getLast? rest'
 
 def flattenNode : INode → RawInline
   | .text s => .text s
@@ -811,7 +820,7 @@ def resolveEmphasis (arr0 : Array INode) : Array INode :=
 -- nearest still-open `[`/`![` marker. A successful link/image wraps the enclosed span
 -- (resolving its emphasis first, scoped to just that span) and, for a link, deactivates
 -- every earlier opener so links can't nest; a failed match falls back to literal text.
-def resolveBrackets (defs : LinkDefs) (gfmStrikethrough : Bool) (arr0 : Array INode) : Array INode :=
+def resolveBrackets (defs : LinkDefs) (opts : Options) (arr0 : Array INode) : Array INode :=
   Id.run do
     let mut arr := arr0
     let mut i := 0
@@ -863,7 +872,7 @@ def resolveBrackets (defs : LinkDefs) (gfmStrikethrough : Bool) (arr0 : Array IN
               | _ => ""
             arr := arr.setIfInBounds j (.text openText)
             let freshTail :=
-              (tokenizeF defs gfmStrikethrough (rawTailText.length + 1) [] (some ']')
+              (tokenizeF defs opts (rawTailText.length + 1) [] (some ']')
                 rawTailText.toList).toArray
             arr := arr.extract 0 i ++ #[.text "]"] ++ freshTail ++ arr.extract (i + 1) arr.size
             i := i + 1
@@ -904,28 +913,29 @@ def narrowInline : RawInline → CommonMark.Inline
   | .htmlInline s => .htmlInline s
   | .softBreak => .softBreak
   | .lineBreak => .lineBreak
-  -- Only ever produced when `gfmStrikethrough = true` (`resolveEmphasis`'s `c == '~'`
+  -- Only ever produced when `opts.gfmStrikethrough` is set (`resolveEmphasis`'s `c == '~'`
   -- branch, reachable only from a `.delim '~' ...` node, itself only ever tokenized when
-  -- `gfmStrikethrough = true`); on the plain CommonMark path this arm is unreachable, but
+  -- it is set); on the plain CommonMark path this arm is unreachable, but
   -- the match still has to be total over all of `RawInline`. Same idiom as `RawBlock.table`'s
   -- fallback in `Block.lean`'s `rawBlockToBlockF`.
   | .strikethrough _ => .text ""
+  | .math display s => .math display s
 
 def narrowInlineList : List RawInline → List CommonMark.Inline
   | [] => []
   | i :: rest => narrowInline i :: narrowInlineList rest
 end
 
-/-- The generalized inline parser shared by both variants: `gfmStrikethrough = true` lets `~`/
-    `~~` runs compete as delimiters in `resolveEmphasis`'s scan, same as `*`/`_`; `false`
+/-- The generalized inline parser shared by both variants. `opts.gfmStrikethrough` lets `~`/
+    `~~` runs compete as delimiters in `resolveEmphasis`'s scan, same as `*`/`_`; unset, it
     leaves `~` as ordinary text, byte-for-byte what `tokenizeF`/`takePlainRun` did before `~`
     existed (see their doc comments). -/
-def parseInlineRaw (gfmStrikethrough : Bool) (defs : LinkDefs) (s : String) : List RawInline :=
+def parseInlineRaw (opts : Options) (defs : LinkDefs) (s : String) : List RawInline :=
   let chars := stripTrailingWsChars s.toList
-  let tokens := (tokenizeF defs gfmStrikethrough (chars.length + 1) [] none chars).toArray
-  flattenNodes (resolveEmphasis (resolveBrackets defs gfmStrikethrough tokens))
+  let tokens := (tokenizeF defs opts (chars.length + 1) [] none chars).toArray
+  flattenNodes (resolveEmphasis (resolveBrackets defs opts tokens))
 
-def parseInline (defs : LinkDefs) (s : String) : List CommonMark.Inline :=
-  narrowInlineList (parseInlineRaw false defs s)
+def parseInline (opts : Options) (defs : LinkDefs) (s : String) : List CommonMark.Inline :=
+  narrowInlineList (parseInlineRaw opts defs s)
 
 end CommonMark.Parser

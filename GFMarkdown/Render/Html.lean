@@ -25,6 +25,7 @@ def plainTextOf : RawInline → String
   | .softBreak => "\n"
   | .lineBreak => "\n"
   | .strikethrough content => plainTextOfList content
+  | .math _ s => s
 
 def plainTextOfList (content : List RawInline) : String :=
   content.foldl (init := "") fun acc i => acc ++ plainTextOf i
@@ -47,6 +48,12 @@ def inlineNodes (i : RawInline) : List (Html.Node .phrasing) :=
   | .softBreak => [("\n" : Html.Node .phrasing)]
   | .lineBreak => [Html.br {}, ("\n" : Html.Node .phrasing)]
   | .strikethrough content => [Html.del (inlineListNodes content)]
+  -- Identical to `CommonMark.inlineNodes`' `.math` case; see the comment there for why the
+  -- `\(`/`\[` delimiters are re-emitted.
+  | .math display s =>
+    [Html.span
+      [((if display then "\\[" ++ s ++ "\\]" else "\\(" ++ s ++ "\\)") : Html.Node .phrasing)]
+      { class_ := if display then "math display" else "math inline" }]
 
 def inlineListNodes : List RawInline → List (Html.Node .phrasing)
   | [] => []

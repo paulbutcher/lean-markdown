@@ -202,7 +202,7 @@ def InlineZipper.down (z : InlineZipper) : Option InlineZipper :=
       | i :: rest => some
           { focus := i, leftSiblings := [], rightSiblings := rest,
             ctx := .image dest title z.leftSiblings z.rightSiblings z.ctx }
-  | .text .. | .code .. | .htmlInline .. | .softBreak | .lineBreak => none
+  | .text .. | .code .. | .math .. | .htmlInline .. | .softBreak | .lineBreak => none
 
 /-- `up` from an `InlineZipper` may stay inside inline content (emph, strong, link,
     image) or cross back to the hosting paragraph/heading. Unlike `BlockZipper.up`,

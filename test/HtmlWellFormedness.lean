@@ -24,7 +24,7 @@ def Inline.noHtml : Inline → Bool
   | .strong content => Inline.noHtmlList content
   | .link _ _ content => Inline.noHtmlList content
   | .image _ _ content => Inline.noHtmlList content
-  | .text _ | .code _ | .softBreak | .lineBreak => true
+  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
 
 def Inline.noHtmlList : List Inline → Bool
   | [] => true
@@ -129,6 +129,11 @@ theorem inlineNodes_wellFormed :
     rcases hn with hn | hn
     · subst hn; exact Node.voidElement_wellFormed .phrasing "br" _
     · subst hn; exact Node.text_wellFormed "\n"
+  | .math .., _ => by
+    intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
+    exact Node.element_wellFormed .phrasing "span" _ _ (by
+      intro c hc; simp only [List.mem_singleton] at hc; subst hc
+      split <;> exact Node.text_wellFormed _)
 
 theorem inlineListNodes_wellFormed :
     (l : List Inline) → Inline.noHtmlList l = true → ∀ n ∈ inlineListNodes l, Node.WellFormed n

@@ -11,4 +11,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      # md4c is the differential-testing oracle for the LaTeX math extension, and is built
+      # from source at a pinned tag. The runner image already provides gcc and make; cmake is
+      # md4c's build system, installed explicitly rather than relied on being preinstalled.
+      - name: Install md4c build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake
+
       - uses: leanprover/lean-action@v1

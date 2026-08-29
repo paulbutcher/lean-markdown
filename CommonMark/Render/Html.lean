@@ -73,6 +73,7 @@ def plainTextOf (i : Inline) : String :=
   | .htmlInline _ => ""
   | .softBreak => "\n"
   | .lineBreak => "\n"
+  | .math _ s => s
 
 def plainTextOfInlines (content : List Inline) : String :=
   content.foldl (init := "") fun acc i => acc ++ plainTextOf i
@@ -96,6 +97,14 @@ def inlineNodes (i : Inline) : List (Html.Node .phrasing) :=
   | .htmlInline s => [Html.Node.unsafeRaw s]
   | .softBreak => [("\n" : Html.Node .phrasing)]
   | .lineBreak => [Html.br {}, ("\n" : Html.Node .phrasing)]
+  -- The `\(`/`\[` delimiters are re-emitted around the LaTeX source rather than dropped with
+  -- the `$`s: they are what a stock MathJax or KaTeX configuration scans for, so the output
+  -- typesets with no further setup. The `math inline`/`math display` classes match what
+  -- pandoc and commonmark-hs already emit.
+  | .math display s =>
+    [Html.span
+      [((if display then "\\[" ++ s ++ "\\]" else "\\(" ++ s ++ "\\)") : Html.Node .phrasing)]
+      { class_ := if display then "math display" else "math inline" }]
 
 def inlineListNodes : List Inline → List (Html.Node .phrasing)
   | [] => []
