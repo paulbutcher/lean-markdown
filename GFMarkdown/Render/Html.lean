@@ -139,9 +139,9 @@ def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
 -- `checked = some _` prefixes the item with GFM's disabled checkbox, taking the place of the
 -- `[ ] `/`[x] ` text `GFMarkdown.Parser.taskListChecked` stripped from its first paragraph.
 -- `disabled`/`checked` are built via `rawAttrs`, not `InputAttrs`'s own boolean fields: those
--- render as bare HTML5-minimized flags (`disabled`), but cmark-gfm's own output (and this
--- library's conformance target) uses explicit `disabled=""`/`checked=""`, checked before
--- disabled.
+-- render as flags, which under `.xhtml` become `disabled="disabled"`, but cmark-gfm's own
+-- output (and this library's conformance target) uses explicit `disabled=""`/`checked=""`,
+-- checked before disabled.
 def checkboxNodes (checked : Option Bool) : List (Html.Node .flow) :=
   match checked with
   | none => []
@@ -174,7 +174,7 @@ end
 
 def renderBlocks (tight : Bool) (blocks : List Block) : String :=
   (renderBlocksNodeF tight (Block.listCount blocks + 1) blocks).foldl
-    (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+    (fun acc n => acc ++ n.render .xhtml) ""
 
 /-- Renders a `Document` to HTML. Shares `CommonMark.renderHtml`'s escaping/safety guarantees
     (both go through the same `Html` node constructors); the new `<table>`/`<thead>`/`<tbody>`

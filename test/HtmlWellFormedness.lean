@@ -60,19 +60,19 @@ open Html
     already-`WellFormedHtml` accumulator, stays `WellFormedHtml`: each step is exactly
     `WellFormedHtml.append` of the accumulator so far with `Node.render_wellFormed` for
     the next node. -/
-private theorem foldl_render_wellFormed {cat : Category} (selfClosingVoid : Bool)
+private theorem foldl_render_wellFormed {cat : Category} (dialect : Dialect)
     (l : List (Node cat)) (h : ∀ n ∈ l, Node.WellFormed n) :
-    ∀ acc, WellFormedHtml selfClosingVoid acc →
-      WellFormedHtml selfClosingVoid
-        (l.foldl (fun acc n => acc ++ n.render (selfClosingVoid := selfClosingVoid)) acc) := by
+    ∀ acc, WellFormedHtml dialect acc →
+      WellFormedHtml dialect
+        (l.foldl (fun acc n => acc ++ n.render dialect) acc) := by
   induction l with
   | nil => intro acc hacc; simpa using hacc
   | cons n rest ih =>
     intro acc hacc
     simp only [List.foldl_cons]
     exact ih (fun n' hn' => h n' (List.mem_cons_of_mem _ hn'))
-      (acc ++ n.render (selfClosingVoid := selfClosingVoid))
-      (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) selfClosingVoid))
+      (acc ++ n.render dialect)
+      (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) dialect))
 
 /-- Membership in `if cond then A ++ [x] ++ B else A ++ B`, regardless of `cond`: weakens to
     "came from `A`, is `x`, or came from `B`" without needing to know (or re-elaborate) what
@@ -305,11 +305,11 @@ end
     output -- this theorem covers exactly the fragment of CommonMark where that can't
     happen. -/
 theorem renderHtml_wellFormed (doc : Document) (h : doc.hasEmbeddedHtml = false) :
-    Html.WellFormedHtml true (renderHtml doc) := by
+    Html.WellFormedHtml .xhtml (renderHtml doc) := by
   have h' : Block.noHtmlListF (Block.listCount doc + 1) doc = true := by
     simpa [Document.hasEmbeddedHtml] using h
   unfold renderHtml renderBlocks
-  exact foldl_render_wellFormed true _ (renderBlocksNodeF_wellFormed false _ doc h')
+  exact foldl_render_wellFormed .xhtml _ (renderBlocksNodeF_wellFormed false _ doc h')
     "" (WellFormedHtml.text (by simp))
 
 end CommonMark

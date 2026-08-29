@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.6.0] - 2026-08-29
+
+* Optional LaTeX math (`Options.math`), following md4c's dialect and emitting pandoc's `math inline`/`math display` spans
+* Delimiter flanking after an entity reference now uses the source `;` rather than the decoded character, so `&#65;_foo_` emphasizes
+
 ## [0.5.0] - 2026-08-21
 
 Move to Lean's module system.

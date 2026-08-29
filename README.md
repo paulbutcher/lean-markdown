@@ -136,16 +136,26 @@ lake test    # run the example-suite conformance test and other tests
 - `test/SpecGuards.lean`: every example in the official CommonMark spec.
 - `test/GfmGuards.lean`: GFM extension examples.
 - `test/GfmRegressionGuards.lean`: regression cases from cmark-gfm.
+- `test/MathGuards.lean`: md4c's own example suite for the LaTeX math extension.
+- `test/MathInteractionGuards.lean`: the flanking, run-length, and construct-interaction cases
+  that suite doesn't reach, authored here with expected output captured from md4c itself.
 
-All three are generated from the vendored test suites; see 
-[test/vendor/README.md](test/vendor/README.md).
+All five are generated from the suites under `test/vendor/`; see 
+[test/vendor/README.md](test/vendor/README.md). `test/MathDivergenceGuards.lean` is hand-written
+instead: it pins the inputs where this library's math output deliberately differs from md4c's,
+so that "fixing" one fails there and forces [KNOWN_ISSUES.md](KNOWN_ISSUES.md) to be updated
+alongside.
 
 ## Property-based testing
 
 `test/GfmNonEmissionProperties.lean` uses [Plausible](https://github.com/leanprover-community/plausible)
 to fuzz two claims about parser fallback paths that aren't (yet) formally proven: that
 randomly generated tables and strikethrough-shaped input never lose text in the
-rendered output. `test/SanitizeExamples.lean` fuzzes every capitalization of the
+rendered output. `test/MathProperties.lean` fuzzes three more whole-pipeline claims, these
+about the LaTeX math extension: that math-shaped input keeps every `$` while the extension
+is off (what makes the opt-in real), that switching it on yields a math span carrying the
+LaTeX source through intact, and that no `$` survives once the delimiters have been
+consumed. `test/SanitizeExamples.lean` fuzzes every capitalization of the
 `javascript:` URI scheme against `renderHtmlSafe`, on top of its hand-picked examples of
 `Document.sanitize` neutralizing specific known-dangerous input end-to-end.
 

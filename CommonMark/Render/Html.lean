@@ -115,10 +115,10 @@ end
 -- Markdown-extension AST that embeds `List Inline` at its leaves (e.g. a table cell's
 -- content) needs to render that embedded content identically to this renderer.
 def renderInline (i : Inline) : String :=
-  (inlineNodes i).foldl (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+  (inlineNodes i).foldl (fun acc n => acc ++ n.render .xhtml) ""
 
 def renderInlines (content : List Inline) : String :=
-  (inlineListNodes content).foldl (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+  (inlineListNodes content).foldl (fun acc n => acc ++ n.render .xhtml) ""
 
 def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.Node .flow :=
   match level.val with
@@ -200,7 +200,7 @@ end
 -- tight-list-style paragraph wrapping, matching the meaning of `Block.list`'s own field.
 def renderBlocks (tight : Bool) (blocks : List Block) : String :=
   (renderBlocksNodeF tight (Block.listCount blocks + 1) blocks).foldl
-    (fun acc n => acc ++ n.render (selfClosingVoid := true)) ""
+    (fun acc n => acc ++ n.render .xhtml) ""
 
 /-- Renders a `Document` to HTML per the spec's exact escaping and formatting rules.
     No AST leaf's string content can produce unescaped `<`, `>`, `&`, or unescaped `"`

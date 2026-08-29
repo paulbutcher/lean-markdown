@@ -60,19 +60,19 @@ open Html
 /-- Folding `.render` over a list of already-`WellFormed` nodes, starting from an
     already-`WellFormedHtml` accumulator, stays `WellFormedHtml`. Identical in shape to
     `CommonMark.foldl_render_wellFormed`; re-derived here since that one is `private`. -/
-private theorem foldl_render_wellFormed {cat : Category} (selfClosingVoid : Bool)
+private theorem foldl_render_wellFormed {cat : Category} (dialect : Dialect)
     (l : List (Node cat)) (h : ∀ n ∈ l, Node.WellFormed n) :
-    ∀ acc, WellFormedHtml selfClosingVoid acc →
-      WellFormedHtml selfClosingVoid
-        (l.foldl (fun acc n => acc ++ n.render (selfClosingVoid := selfClosingVoid)) acc) := by
+    ∀ acc, WellFormedHtml dialect acc →
+      WellFormedHtml dialect
+        (l.foldl (fun acc n => acc ++ n.render dialect) acc) := by
   induction l with
   | nil => intro acc hacc; simpa using hacc
   | cons n rest ih =>
     intro acc hacc
     simp only [List.foldl_cons]
     exact ih (fun n' hn' => h n' (List.mem_cons_of_mem _ hn'))
-      (acc ++ n.render (selfClosingVoid := selfClosingVoid))
-      (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) selfClosingVoid))
+      (acc ++ n.render dialect)
+      (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) dialect))
 
 /-- Membership in `if cond then A ++ [x] ++ B else A ++ B`, regardless of `cond`. Identical in
     shape to `CommonMark.mem_ite_append`; re-derived here since that one is `private`. -/
@@ -424,11 +424,11 @@ end
     shape and same necessary exclusion as `CommonMark.renderHtml_wellFormed`; see its own
     doc comment for why the `hasEmbeddedHtml` precondition can't be dropped. -/
 theorem renderHtml_wellFormed (doc : Document) (h : doc.hasEmbeddedHtml = false) :
-    Html.WellFormedHtml true (renderHtml doc) := by
+    Html.WellFormedHtml .xhtml (renderHtml doc) := by
   have h' : Block.noHtmlListF (Block.listCount doc + 1) doc = true := by
     simpa [Document.hasEmbeddedHtml] using h
   unfold renderHtml renderBlocks
-  exact foldl_render_wellFormed true _ (renderBlocksNodeF_wellFormed false _ doc h')
+  exact foldl_render_wellFormed .xhtml _ (renderBlocksNodeF_wellFormed false _ doc h')
     "" (WellFormedHtml.text (by simp))
 
 end GFMarkdown
