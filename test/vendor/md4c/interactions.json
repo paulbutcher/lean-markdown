@@ -439,5 +439,68 @@
     "end_line": 414,
     "section": "Content is opaque",
     "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&#65;$x$\n",
+    "html": "<p>A<x-equation>x</x-equation></p>\n",
+    "example": 50,
+    "start_line": 424,
+    "end_line": 430,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&#x41;_foo_\n",
+    "html": "<p>A<em>foo</em></p>\n",
+    "example": 51,
+    "start_line": 432,
+    "end_line": 438,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&#65;*foo*\n",
+    "html": "<p>A<em>foo</em></p>\n",
+    "example": 52,
+    "start_line": 440,
+    "end_line": 446,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&amp;$x$\n",
+    "html": "<p>&amp;<x-equation>x</x-equation></p>\n",
+    "example": 53,
+    "start_line": 448,
+    "end_line": 454,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&nbsp;$x$\n",
+    "html": "<p> <x-equation>x</x-equation></p>\n",
+    "example": 54,
+    "start_line": 456,
+    "end_line": 462,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&#46;$x$\n",
+    "html": "<p>.<x-equation>x</x-equation></p>\n",
+    "example": 55,
+    "start_line": 464,
+    "end_line": 470,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "&copy;_foo_\n",
+    "html": "<p>©<em>foo</em></p>\n",
+    "example": 56,
+    "start_line": 472,
+    "end_line": 478,
+    "section": "Entity references",
+    "extensions": "--flatex-math"
   }
 ]

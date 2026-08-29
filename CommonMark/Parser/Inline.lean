@@ -678,7 +678,12 @@ def tokenizeF (defs : LinkDefs) (opts : Options) :
   | fuel + 1, stack, _, '&' :: rest =>
     match parseEntityRef rest with
     | some (txt, after) =>
-      .text txt :: tokenizeF defs opts fuel stack txt.toList.getLast? after
+      -- Flanking is classified on the *source* character before a delimiter, not on what the
+      -- entity decoded to, matching cmark's `scan_delims` (which indexes back into the input
+      -- buffer) and md4c. Every form `parseEntityRef` accepts ends in `;`, so that is the
+      -- character a following delimiter run sees. The two differ whenever an entity decodes to
+      -- an alphanumeric: `&#65;_foo_` is emphasized, where the decoded `A` would suppress it.
+      .text txt :: tokenizeF defs opts fuel stack (some ';') after
     | none => .text "&" :: tokenizeF defs opts fuel stack (some '&') rest
   | fuel + 1, stack, _, '<' :: rest =>
     match matchAutolink rest with

@@ -95,7 +95,7 @@ reference implementation for it, as cmark is for `CommonMark/` and cmark-gfm for
 - `spec-latex-math.txt` is md4c's own example suite for the extension (6 examples),
   fetched verbatim from
   https://github.com/mity/md4c/blob/release-0.5.3/test/spec-latex-math.txt.
-- `interactions.txt` (49 examples) is *authored here*, not vendored: md4c's own suite
+- `interactions.txt` (56 examples) is *authored here*, not vendored: md4c's own suite
   covers none of the flanking corners, run-length matching, opener-stack behaviour, or
   interaction with the constructs md4c resolves before `$`. Its expected output was
   captured from `md2html --flatex-math` at the same tag.
@@ -120,7 +120,7 @@ CI runs after building the oracle with `scripts/build_md4c.sh` (that script pins
 tag). Since `lake test` checks this library against the same recordings, the two together
 are what pin the extension to md4c's behaviour. The inputs where the two deliberately
 differ are deliberately absent from these files; they live in
-`test/MathDivergenceGuards.lean`, with `KNOWN_ISSUES.md` 4 and 5 for the reasons.
+`test/MathDivergenceGuards.lean`, with `KNOWN_ISSUES.md` 4 for the reason.
 
 ## License
 

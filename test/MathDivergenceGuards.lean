@@ -27,11 +27,3 @@ meta import CheckExampleMath
 #guard checkExampleMath 3 "Crossing" "**a $b** c$\n"
   "<p>**a <span class=\"math inline\">\\(b** c\\)</span></p>\n"
 
--- Flanking after an entity reference (KNOWN_ISSUES.md 5). Pre-existing and not math-specific:
--- the tokenizer feeds the decoded character into flanking where md4c uses the raw `;`. The
--- second guard is the same quirk reached through emphasis, with no math involved, and is what
--- shows this is not something the math extension introduced.
--- md4c: <p>A<x-equation>x</x-equation></p>
-#guard checkExampleMath 4 "Entity flanking" "&#65;$x$\n" "<p>A$x$</p>\n"
--- md4c: <p>A<em>foo</em></p>
-#guard checkExampleMath 5 "Entity flanking" "&#65;_foo_\n" "<p>A_foo_</p>\n"

@@ -412,3 +412,67 @@ $a $$$ b$
 .
 --flatex-math
 ````````````````````````````````
+
+Entity references are resolved before delimiter flanking is classified, and flanking is
+classified on the *source* character (always the `;`), not on what the entity decoded to. The
+two differ only when an entity decodes to an alphanumeric. The emphasis cases below carry no
+math at all; they are here because they share that root cause, and because md4c is the oracle
+for both.
+
+## Entity references
+
+```````````````````````````````` example
+&#65;$x$
+.
+<p>A<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&#x41;_foo_
+.
+<p>A<em>foo</em></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&#65;*foo*
+.
+<p>A<em>foo</em></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&amp;$x$
+.
+<p>&amp;<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&nbsp;$x$
+.
+<p> <x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&#46;$x$
+.
+<p>.<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+&copy;_foo_
+.
+<p>©<em>foo</em></p>
+.
+--flatex-math
+````````````````````````````````
