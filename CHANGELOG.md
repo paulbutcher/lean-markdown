@@ -1,16 +1,11 @@
-<!--
-Copyright (c) 2026 Paul Butcher. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--->
-
 # Changelog
 
-## [Unreleased]
+## [0.7.0] - 2026-08-29
 
-* The build treats warnings as errors, in both the library and the test package
 * `renderHtmlSafe`'s output is now proved well-formed for every input, with no no-embedded-raw-HTML side condition
 * `Document.sanitize` is proved idempotent
 * URI scheme allowlisting is proved case-insensitive, so no capitalization of a non-allowlisted scheme is accepted
+* The build treats warnings as errors, in both the library and the test package
 
 ## [0.6.0] - 2026-08-29
 

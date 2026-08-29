@@ -1,8 +1,3 @@
-<!--
-Copyright (c) 2026 Paul Butcher. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--->
-
 # CLAUDE.md
 
 Guidance for Claude Code, and any other coding agent, working in this repo. Contributors are welcome to work another way, but agents run against this file by default.

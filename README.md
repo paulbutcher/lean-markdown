@@ -1,8 +1,3 @@
-<!--
-Copyright (c) 2026 Paul Butcher. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--->
-
 # lean-markdown
 
 A Markdown parser and HTML renderer for Lean 4. Supports both [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/) and [GitHub Flavored Markdown (GFM)](https://github.com/github/cmark-gfm/).
