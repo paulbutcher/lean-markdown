@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Paul Butcher. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
 # Builds md4c's md2html, the differential-testing oracle for the LaTeX math extension
 # (scripts/diff_md4c.sh). Clones and builds under build/, which is gitignored; nothing here
 # reaches the dependency graph a consumer of this library resolves.

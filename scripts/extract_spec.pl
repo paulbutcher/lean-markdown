@@ -1,4 +1,6 @@
 #!/usr/bin/env perl
+# Copyright (c) 2026 Paul Butcher. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
 # Extracts the example suite embedded in a CommonMark spec.txt into JSON,
 # reproducing the schema produced by commonmark-spec's test/spec_tests.py
 # --dump-tests. Re-run after vendoring a new spec.txt to refresh spec.json.

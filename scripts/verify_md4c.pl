@@ -1,4 +1,6 @@
 #!/usr/bin/env perl
+# Copyright (c) 2026 Paul Butcher. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
 # Re-checks the recorded expected output in test/vendor/md4c/*.json against what md4c's own
 # md2html actually produces, at the tag scripts/build_md4c.sh pins.
 #

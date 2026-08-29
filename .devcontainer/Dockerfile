@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Paul Butcher. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
+
 FROM mcr.microsoft.com/devcontainers/base:resolute
 
 # md4c is the differential-testing oracle for the LaTeX math extension, and is built from

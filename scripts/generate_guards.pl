@@ -1,4 +1,6 @@
 #!/usr/bin/env perl
+# Copyright (c) 2026 Paul Butcher. All rights reserved.
+# Released under Apache 2.0 license as described in the file LICENSE.
 # Generates one `#guard` per example from a vendored spec.json-shaped file (see
 # extract_spec.pl). Defaults to test/SpecGuards.lean's own checkExample/CheckExample; pass
 # a different checker function and import module to generate against another entry point

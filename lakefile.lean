@@ -1,8 +1,11 @@
+-- Copyright (c) 2026 Paul Butcher. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
 import Lake
 open Lake DSL
 
 package markdown where
   version := v!"0.6.0"
+  leanOptions := #[⟨`warningAsError, true⟩]
 
 require html from git "https://github.com/paulbutcher/lean-html" @ "v0.9.0"
 
