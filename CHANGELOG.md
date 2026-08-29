@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+* `renderHtmlSafe`'s output is now proved well-formed for every input, with no no-embedded-raw-HTML side condition
+* `Document.sanitize` is proved idempotent
+* URI scheme allowlisting is proved case-insensitive, so no capitalization of a non-allowlisted scheme is accepted
+
 ## [0.6.0] - 2026-08-29
 
 * Optional LaTeX math (`Options.math`), following md4c's dialect and emitting pandoc's `math inline`/`math display` spans

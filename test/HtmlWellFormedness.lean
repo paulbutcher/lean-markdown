@@ -2,7 +2,7 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 module
 
-public import CommonMark
+public import NoEmbeddedHtml
 
 @[expose] public section
 
@@ -10,49 +10,16 @@ public import CommonMark
 -- for `.htmlInline`/`.htmlBlock`, which use `Html.Node.unsafeRaw` to pass literal HTML from
 -- the Markdown source through verbatim -- the one place `Html.Node.WellFormed` can fail to
 -- hold. So a `Document` containing no `.htmlInline`/`.htmlBlock` anywhere renders to
--- well-formed HTML: balanced tags, no stray `<`/`>` outside of tag syntax
--- (`Html.WellFormedHtml`). This mirrors `renderBlockNodesF`/`renderBlocksNodeF`'s own
--- structure (mutual, fuel-bounded for `Block`, plain structural for `Inline`) so the
--- well-formedness proof can induct case-for-case alongside the renderer.
+-- well-formed HTML: balanced tags, no stray `<`/`>` outside of tag syntax, and every
+-- attribute run a sequence of quoted `name="value"` pairs (`Html.WellFormedHtml`, which at
+-- the `.xhtml` dialect `renderHtml` uses makes that output well-formed XML). The proofs
+-- mirror `renderBlockNodesF`/`renderBlocksNodeF`'s own structure so they can induct
+-- case-for-case alongside the renderer.
+--
+-- `RenderSafeWellFormedness.lean` retires the no-embedded-HTML hypothesis for
+-- `renderHtmlSafe`, which sanitizes it away.
 
 namespace CommonMark
-
-mutual
-def Inline.noHtml : Inline → Bool
-  | .htmlInline _ => false
-  | .emph content => Inline.noHtmlList content
-  | .strong content => Inline.noHtmlList content
-  | .link _ _ content => Inline.noHtmlList content
-  | .image _ _ content => Inline.noHtmlList content
-  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
-
-def Inline.noHtmlList : List Inline → Bool
-  | [] => true
-  | i :: rest => Inline.noHtml i && Inline.noHtmlList rest
-end
-
-mutual
-def Block.noHtmlF : Nat → Block → Bool
-  | 0, _ => true
-  | _ + 1, .paragraph content => Inline.noHtmlList content
-  | _ + 1, .heading _ content => Inline.noHtmlList content
-  | _ + 1, .codeBlock .. => true
-  | _ + 1, .thematicBreak => true
-  | _ + 1, .htmlBlock _ => false
-  | fuel + 1, .blockQuote content => Block.noHtmlListF fuel content
-  | fuel + 1, .list _ _ items => items.all (Block.noHtmlListF fuel)
-
-def Block.noHtmlListF : Nat → List Block → Bool
-  | 0, _ => true
-  | _ + 1, [] => true
-  | fuel + 1, b :: rest => Block.noHtmlF fuel b && Block.noHtmlListF fuel rest
-end
-
-/-- Whether a `Document` contains any embedded raw HTML (`.htmlInline`/`.htmlBlock`),
-    the only channel through which `renderHtml` can produce output that isn't
-    `Html.Node.WellFormed`. -/
-def Document.hasEmbeddedHtml (doc : Document) : Bool :=
-  !Block.noHtmlListF (Block.listCount doc + 1) doc
 
 open Html
 
@@ -97,7 +64,7 @@ private theorem mem_ite_append {α : Type} (cond : Bool) (A B : List α) (x n : 
 -- so each case's induction hypothesis is exactly the fact needed about its recursive call.
 mutual
 theorem inlineNodes_wellFormed :
-    (i : Inline) → Inline.noHtml i = true → ∀ n ∈ inlineNodes i, Node.WellFormed n
+    (i : Inline) → Inline.noEmbeddedHtml i = true → ∀ n ∈ inlineNodes i, Node.WellFormed n
   | .text s, _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     exact Node.text_wellFormed s
@@ -107,20 +74,20 @@ theorem inlineNodes_wellFormed :
       intro c hc; simp only [List.mem_singleton] at hc; subst hc; exact Node.text_wellFormed s)
   | .emph content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
-    simp only [Inline.noHtml] at h
+    simp only [Inline.noEmbeddedHtml] at h
     exact Node.element_wellFormed .phrasing "em" _ _ (inlineListNodes_wellFormed content h)
   | .strong content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
-    simp only [Inline.noHtml] at h
+    simp only [Inline.noEmbeddedHtml] at h
     exact Node.element_wellFormed .phrasing "strong" _ _ (inlineListNodes_wellFormed content h)
   | .link _ _ content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
-    simp only [Inline.noHtml] at h
+    simp only [Inline.noEmbeddedHtml] at h
     exact Node.element_wellFormed .phrasing "a" _ _ (inlineListNodes_wellFormed content h)
   | .image .., _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     exact Node.voidElement_wellFormed .phrasing "img" _
-  | .htmlInline _, h => by simp [Inline.noHtml] at h
+  | .htmlInline _, h => by simp [Inline.noEmbeddedHtml] at h
   | .softBreak, _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     exact Node.text_wellFormed "\n"
@@ -136,10 +103,10 @@ theorem inlineNodes_wellFormed :
       split <;> exact Node.text_wellFormed _)
 
 theorem inlineListNodes_wellFormed :
-    (l : List Inline) → Inline.noHtmlList l = true → ∀ n ∈ inlineListNodes l, Node.WellFormed n
+    (l : List Inline) → Inline.noEmbeddedHtmlList l = true → ∀ n ∈ inlineListNodes l, Node.WellFormed n
   | [], _ => by intro n hn; simp [inlineListNodes] at hn
   | i :: rest, h => by
-    simp only [Inline.noHtmlList, Bool.and_eq_true] at h
+    simp only [Inline.noEmbeddedHtmlList, Bool.and_eq_true] at h
     intro n hn
     simp only [inlineListNodes, List.mem_append] at hn
     rcases hn with hn | hn
@@ -189,14 +156,14 @@ private theorem foldl_append_mem {α β : Type} (f : α → List β) :
       exact Or.inr ⟨x', List.mem_cons_of_mem _ hx', hy'⟩
 
 -- Mirrors `renderBlockNodesF`/`renderBlocksNodeF`/`itemNode`'s own mutual, fuel-bounded
--- recursion case-for-case, exactly as `Block.noHtmlF`/`Block.noHtmlListF` were defined to.
+-- recursion case-for-case, exactly as `Block.noEmbeddedHtmlF`/`Block.noEmbeddedHtmlListF` were defined to.
 mutual
 theorem renderBlockNodesF_wellFormed :
-    (tight : Bool) → (fuel : Nat) → (b : Block) → Block.noHtmlF fuel b = true →
+    (tight : Bool) → (fuel : Nat) → (b : Block) → Block.noEmbeddedHtmlF fuel b = true →
       ∀ n ∈ renderBlockNodesF tight fuel b, Node.WellFormed n
   | _, 0, _, _ => by intro n hn; simp [renderBlockNodesF] at hn
   | tight, _ + 1, .paragraph content, h => by
-    simp only [Block.noHtmlF] at h
+    simp only [Block.noEmbeddedHtmlF] at h
     simp only [renderBlockNodesF]
     split
     · intro n hn
@@ -209,7 +176,7 @@ theorem renderBlockNodesF_wellFormed :
         exact Node.elementOf_wellFormed .flow .phrasing "p" _ _ (inlineListNodes_wellFormed content h)
       · subst hn; exact Node.text_wellFormed "\n"
   | _, _ + 1, .heading level content, h => by
-    simp only [Block.noHtmlF] at h
+    simp only [Block.noEmbeddedHtmlF] at h
     intro n hn
     simp only [renderBlockNodesF, List.mem_cons, List.not_mem_nil, or_false] at hn
     rcases hn with hn | hn
@@ -233,9 +200,9 @@ theorem renderBlockNodesF_wellFormed :
     rcases hn with hn | hn
     · subst hn; exact Node.voidElement_wellFormed .flow "hr" _
     · subst hn; exact Node.text_wellFormed "\n"
-  | _, _ + 1, .htmlBlock _, h => by simp [Block.noHtmlF] at h
+  | _, _ + 1, .htmlBlock _, h => by simp [Block.noEmbeddedHtmlF] at h
   | _, fuel + 1, .blockQuote content, h => by
-    simp only [Block.noHtmlF] at h
+    simp only [Block.noEmbeddedHtmlF] at h
     intro n hn
     simp only [renderBlockNodesF, List.mem_cons, List.not_mem_nil, or_false] at hn
     rcases hn with hn | hn
@@ -248,8 +215,8 @@ theorem renderBlockNodesF_wellFormed :
         · exact renderBlocksNodeF_wellFormed false fuel content h c hc)
     · subst hn; exact Node.text_wellFormed "\n"
   | _, fuel + 1, .list kind isTight items, h => by
-    simp only [Block.noHtmlF] at h
-    have hitems : ∀ c ∈ items, Block.noHtmlListF fuel c = true := List.all_eq_true.mp h
+    simp only [Block.noEmbeddedHtmlF] at h
+    have hitems : ∀ c ∈ items, Block.noEmbeddedHtmlListF fuel c = true := List.all_eq_true.mp h
     have hitemNode : ∀ content ∈ items, Node.WellFormed (itemNode isTight fuel content) := by
       intro content hcontent
       unfold itemNode
@@ -282,12 +249,12 @@ theorem renderBlockNodesF_wellFormed :
     · subst hn; exact Node.text_wellFormed "\n"
 
 theorem renderBlocksNodeF_wellFormed :
-    (tight : Bool) → (fuel : Nat) → (bs : List Block) → Block.noHtmlListF fuel bs = true →
+    (tight : Bool) → (fuel : Nat) → (bs : List Block) → Block.noEmbeddedHtmlListF fuel bs = true →
       ∀ n ∈ renderBlocksNodeF tight fuel bs, Node.WellFormed n
   | _, 0, _, _ => by intro n hn; simp [renderBlocksNodeF] at hn
   | _, _ + 1, [], _ => by intro n hn; simp [renderBlocksNodeF] at hn
   | tight, fuel + 1, b :: rest, h => by
-    simp only [Block.noHtmlListF, Bool.and_eq_true] at h
+    simp only [Block.noEmbeddedHtmlListF, Bool.and_eq_true] at h
     unfold renderBlocksNodeF
     dsimp only
     intro n hn
@@ -306,7 +273,7 @@ end
     happen. -/
 theorem renderHtml_wellFormed (doc : Document) (h : doc.hasEmbeddedHtml = false) :
     Html.WellFormedHtml .xhtml (renderHtml doc) := by
-  have h' : Block.noHtmlListF (Block.listCount doc + 1) doc = true := by
+  have h' : Block.noEmbeddedHtmlListF (Block.listCount doc + 1) doc = true := by
     simpa [Document.hasEmbeddedHtml] using h
   unfold renderHtml renderBlocks
   exact foldl_render_wellFormed .xhtml _ (renderBlocksNodeF_wellFormed false _ doc h')

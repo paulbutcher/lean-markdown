@@ -2,35 +2,19 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 module
 
-public import CommonMark
+public import NoEmbeddedHtml
 
 @[expose] public section
 
 -- `Document.sanitize` (`CommonMark.Sanitize`) is meant to make `renderHtmlSafe`'s output safe
 -- to serve from untrusted Markdown source: no embedded raw HTML, and no link/image `dest`
--- with a non-allowlisted URI scheme. This proves both, mirroring `HtmlWellFormedness.lean`'s
--- own `noHtml`-style predicates and fuel-bounded mutual-induction structure, but stated with
--- an explicit fuel argument matching `Document.sanitize`'s own (`Block.listCount doc`) rather
--- than recomputing fuel from the sanitized document's own shape: `Block.mapListF`'s fuel
--- threading and these predicates' fuel threading are already the same recursion shape, so
--- using the construction fuel directly for observation avoids needing a separate
--- `Block.listCount`-is-preserved-by-`Block.mapF` lemma.
+-- with a non-allowlisted URI scheme. This proves both, over `NoEmbeddedHtml.lean`'s shared
+-- predicate and a destination-checking one of the same fuel-bounded shape. The underlying
+-- claims are left general in their fuel argument so that `RenderSafeWellFormedness.lean` can
+-- instantiate them at the fuel the renderer picks rather than the one `Document.sanitize`
+-- itself ran at.
 
 namespace CommonMark
-
-mutual
-def Inline.noEmbeddedHtml : Inline → Bool
-  | .htmlInline _ => false
-  | .emph content => Inline.noEmbeddedHtmlList content
-  | .strong content => Inline.noEmbeddedHtmlList content
-  | .link _ _ content => Inline.noEmbeddedHtmlList content
-  | .image _ _ content => Inline.noEmbeddedHtmlList content
-  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
-
-def Inline.noEmbeddedHtmlList : List Inline → Bool
-  | [] => true
-  | i :: rest => Inline.noEmbeddedHtml i && Inline.noEmbeddedHtmlList rest
-end
 
 mutual
 def Inline.allDestsSafe : Inline → Bool
@@ -43,23 +27,6 @@ def Inline.allDestsSafe : Inline → Bool
 def Inline.allDestsSafeList : List Inline → Bool
   | [] => true
   | i :: rest => Inline.allDestsSafe i && Inline.allDestsSafeList rest
-end
-
-mutual
-def Block.noEmbeddedHtmlF : Nat → Block → Bool
-  | 0, _ => true
-  | _ + 1, .paragraph content => Inline.noEmbeddedHtmlList content
-  | _ + 1, .heading _ content => Inline.noEmbeddedHtmlList content
-  | _ + 1, .codeBlock .. => true
-  | _ + 1, .thematicBreak => true
-  | _ + 1, .htmlBlock _ => false
-  | fuel + 1, .blockQuote content => Block.noEmbeddedHtmlListF fuel content
-  | fuel + 1, .list _ _ items => items.all (Block.noEmbeddedHtmlListF fuel)
-
-def Block.noEmbeddedHtmlListF : Nat → List Block → Bool
-  | 0, _ => true
-  | _ + 1, [] => true
-  | fuel + 1, b :: rest => Block.noEmbeddedHtmlF fuel b && Block.noEmbeddedHtmlListF fuel rest
 end
 
 mutual

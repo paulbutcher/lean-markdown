@@ -2,7 +2,7 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 module
 
-public import GFMarkdown
+public import GfmNoEmbeddedHtml
 
 @[expose] public section
 
@@ -16,21 +16,6 @@ namespace GFMarkdown
 open CommonMark.Parser (RawInline)
 
 mutual
-def RawInline.noEmbeddedHtml : RawInline → Bool
-  | .htmlInline _ => false
-  | .emph content => RawInline.noEmbeddedHtmlList content
-  | .strong content => RawInline.noEmbeddedHtmlList content
-  | .link _ _ content => RawInline.noEmbeddedHtmlList content
-  | .image _ _ content => RawInline.noEmbeddedHtmlList content
-  | .strikethrough content => RawInline.noEmbeddedHtmlList content
-  | .text _ | .code _ | .math .. | .softBreak | .lineBreak => true
-
-def RawInline.noEmbeddedHtmlList : List RawInline → Bool
-  | [] => true
-  | i :: rest => RawInline.noEmbeddedHtml i && RawInline.noEmbeddedHtmlList rest
-end
-
-mutual
 def RawInline.allDestsSafe : RawInline → Bool
   | .link dest _ content => CommonMark.isSafeUriScheme dest && RawInline.allDestsSafeList content
   | .image dest _ content => CommonMark.isSafeUriScheme dest && RawInline.allDestsSafeList content
@@ -42,26 +27,6 @@ def RawInline.allDestsSafe : RawInline → Bool
 def RawInline.allDestsSafeList : List RawInline → Bool
   | [] => true
   | i :: rest => RawInline.allDestsSafe i && RawInline.allDestsSafeList rest
-end
-
-mutual
-def Block.noEmbeddedHtmlF : Nat → Block → Bool
-  | 0, _ => true
-  | _ + 1, .paragraph content => RawInline.noEmbeddedHtmlList content
-  | _ + 1, .heading _ content => RawInline.noEmbeddedHtmlList content
-  | _ + 1, .codeBlock .. => true
-  | _ + 1, .thematicBreak => true
-  | _ + 1, .htmlBlock _ => false
-  | fuel + 1, .blockQuote content => Block.noEmbeddedHtmlListF fuel content
-  | fuel + 1, .list _ _ items => items.all (fun (_, c) => Block.noEmbeddedHtmlListF fuel c)
-  | _ + 1, .table header _ rows =>
-    header.all RawInline.noEmbeddedHtmlList &&
-      rows.all (fun row => row.all RawInline.noEmbeddedHtmlList)
-
-def Block.noEmbeddedHtmlListF : Nat → List Block → Bool
-  | 0, _ => true
-  | _ + 1, [] => true
-  | fuel + 1, b :: rest => Block.noEmbeddedHtmlF fuel b && Block.noEmbeddedHtmlListF fuel rest
 end
 
 mutual

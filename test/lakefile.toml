@@ -13,7 +13,10 @@ rev = "v4.34.0-rc2"
 
 [[lean_lib]]
 name = "TestData"
-globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
+globs = ["CheckExample", "SpecGuards", "NoEmbeddedHtml", "GfmNoEmbeddedHtml", "AstFuelLaws", "GfmAstFuelLaws",
+  "RenderSafeWellFormedness", "GfmRenderSafeWellFormedness", "UriSchemeLaws",
+  "SanitizeIdempotence", "GfmSanitizeIdempotence",
+  "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
   "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties",
   "GfmHtmlWellFormedness", "SanitizeSafety", "GfmSanitizeSafety", "SanitizeExamples",
   "CheckExampleMath", "MathGuards", "MathInteractionGuards", "MathDivergenceGuards",

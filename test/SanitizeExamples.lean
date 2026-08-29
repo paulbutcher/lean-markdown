@@ -4,10 +4,8 @@ module
 
 public import CommonMark
 public import GFMarkdown
-public import Plausible
 meta import CommonMark
 meta import GFMarkdown
-meta import Plausible
 
 @[expose] public section
 
@@ -15,8 +13,7 @@ meta import Plausible
 -- formally; these are a behavioral safety net on top, through the public
 -- `parseDocument`/`renderHtmlSafe` API a caller actually uses: legitimate content isn't
 -- needlessly lost (the proofs don't rule out a degenerate "always empty" sanitize), and
--- specific known-dangerous inputs (script tags, `javascript:`, mixed-case scheme bypasses)
--- are neutralized end-to-end.
+-- specific known-dangerous inputs (script tags, `javascript:`) are neutralized end-to-end.
 
 open CommonMark.Parser (containsSubstr)
 
@@ -72,16 +69,9 @@ open CommonMark.Parser (containsSubstr)
   (GFMarkdown.renderHtmlSafe (GFMarkdown.parseDocument "~~<img src=x onerror=alert(1)>~~\n"))
   "<img"
 
--- `javascript:` with a mixed-case scheme (a common naive-filter bypass) must be caught too:
--- `isSafeUriScheme` lowercases before checking the allowlist, so this fuzzes over every
--- capitalization rather than trusting a single hand-picked example.
-private def mixedCaseJavascript (bits : Nat) : String :=
-  let letters := "javascript".toList
-  String.ofList (letters.mapIdx (fun i c => if bits >>> i &&& 1 == 1 then c.toUpper else c))
-
-#eval Plausible.Testable.check
-  (∀ bits : Nat,
-    !containsSubstr
-      (CommonMark.renderHtmlSafe
-        (CommonMark.parseDocument s!"[x]({mixedCaseJavascript bits}:alert(1))\n"))
-      ":alert(1)" = true)
+-- One mixed-case `javascript:` end-to-end. Every other capitalization is covered by
+-- `UriSchemeLaws.lean`'s `not_isSafeUriScheme_javascript`, which proves the whole family
+-- rejected rather than sampling it.
+#guard !containsSubstr
+  (CommonMark.renderHtmlSafe (CommonMark.parseDocument "[x](JaVaScRiPt:alert(1))\n"))
+  ":alert(1)"
