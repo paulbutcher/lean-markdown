@@ -132,7 +132,9 @@ All five are generated from the suites under `test/vendor/`; see [test/vendor/RE
 
 ## Property-based testing
 
-`test/GfmNonEmissionProperties.lean` uses [Plausible](https://github.com/leanprover-community/plausible) to fuzz two claims about parser fallback paths that aren't (yet) formally proven: that randomly generated tables and strikethrough-shaped input never lose text in the rendered output. `test/MathProperties.lean` fuzzes three more whole-pipeline claims, these about the LaTeX math extension: that math-shaped input keeps every `$` while the extension is off (what makes the opt-in real), that switching it on yields a math span carrying the LaTeX source through intact, and that no `$` survives once the delimiters have been consumed. `test/SanitizeExamples.lean` holds hand-picked examples of `Document.sanitize` neutralizing specific known-dangerous input end-to-end, a behavioral check on top of the proofs that legitimate content is not needlessly lost either.
+- `test/GfmNonEmissionProperties.lean`: [Plausible](https://github.com/leanprover-community/plausible) fuzzing of two claims about parser fallback paths that aren't (yet) formally proven, that randomly generated tables and strikethrough-shaped input never lose text in the rendered output.
+- `test/MathProperties.lean`: three more fuzzed claims, whole-pipeline this time, about the LaTeX math extension: that math-shaped input keeps every `$` while the extension is off (what makes the opt-in real), that switching it on yields a math span carrying the LaTeX source through intact, and that no `$` survives once the delimiters have been consumed.
+- `test/SanitizeExamples.lean`: not fuzzed, but hand-picked examples of `Document.sanitize` neutralizing specific known-dangerous input end-to-end, a behavioral check on top of the proofs that legitimate content is not needlessly lost either.
 
 ## License
 
