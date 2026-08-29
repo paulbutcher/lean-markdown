@@ -84,13 +84,19 @@ end GFMarkdown.Parser
 
 namespace GFMarkdown
 
+/-- `parseDocument` with further extensions switched on: `{ math := true }` adds md4c's LaTeX
+    math spans alongside GFM's own. GFM's tables and strikethrough are forced on regardless of
+    what `opts` says, since this is the GFM entry point. -/
+def parseDocumentWith (opts : CommonMark.Parser.Options) (s : String) : Document :=
+  let opts := { opts with gfmTables := true, gfmStrikethrough := true }
+  let (blocks, defs) :=
+    CommonMark.Parser.finalizeState (CommonMark.Parser.runLines opts (CommonMark.Parser.splitLines s))
+  tagFilterDocument (autolinkDocument (Parser.groupAndConvertGfm opts defs blocks))
+
 /-- Parses a GFM document into an AST. Total, for the same reason `CommonMark.parseDocument`
     is: every input string produces a `Document` rather than panicking or looping. Covers
     CommonMark's base syntax plus GFM tables, strikethrough, task lists, extended autolinks,
     and the raw-HTML tag filter. -/
-def parseDocument (s : String) : Document :=
-  let (blocks, defs) :=
-    CommonMark.Parser.finalizeState (CommonMark.Parser.runLines Parser.options (CommonMark.Parser.splitLines s))
-  tagFilterDocument (autolinkDocument (Parser.groupAndConvertGfm Parser.options defs blocks))
+def parseDocument (s : String) : Document := parseDocumentWith {} s
 
 end GFMarkdown

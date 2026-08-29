@@ -894,12 +894,18 @@ end CommonMark.Parser
 
 namespace CommonMark
 
-/-- Parses a CommonMark document into an AST. Total: every input string, including
-    malformed or adversarial input, produces a `Document` rather than panicking or
+/-- `parseDocument` with the extension set chosen explicitly. `{ math := true }` adds md4c's
+    LaTeX math spans (`$...$` and `$$...$$`); the GFM extensions are reachable from here too,
+    but `GFMarkdown.parseDocument` is the entry point that pairs them with an AST able to
+    represent what they parse. -/
+def parseDocumentWith (opts : Parser.Options) (s : String) : Document :=
+  let (blocks, defs) := Parser.finalizeState (Parser.runLines opts (Parser.splitLines s))
+  Parser.groupAndConvert opts defs blocks
+
+/-- Parses a CommonMark document into an AST, with no extensions. Total: every input string,
+    including malformed or adversarial input, produces a `Document` rather than panicking or
     looping. Matches the official example suite exactly (see the `#guard` checks in
     `test/SpecGuards.lean`). -/
-def parseDocument (s : String) : Document :=
-  let (blocks, defs) := Parser.finalizeState (Parser.runLines {} (Parser.splitLines s))
-  Parser.groupAndConvert {} defs blocks
+def parseDocument (s : String) : Document := parseDocumentWith {} s
 
 end CommonMark

@@ -68,16 +68,26 @@ def isPunctChar (oc : Option Char) : Bool :=
   | none => false
   | some c => isUnicodePunctOrSymbol c
 
+-- md4c's flanking rule for `$` runs, which constrains the delimiter's *outer* side only: an
+-- opener may not follow an alphanumeric and a closer may not precede one. There is
+-- deliberately no constraint on what sits just inside the delimiters, which is where this
+-- differs from Pandoc's rule: `$ 4 $` is math here and `2000$x$` is not, and Pandoc has it
+-- exactly the other way around.
+def mathCanOpen (before : Option Char) : Bool := isWsOrNone before || isPunctChar before
+def mathCanClose (after : Option Char) : Bool := isWsOrNone after || isPunctChar after
+
 def skipLeadingSpacesTabs : List Char → List Char
   | c :: rest => if c == ' ' || c == '\t' then skipLeadingSpacesTabs rest else c :: rest
   | [] => []
 
--- `opts.gfmStrikethrough` only adds `~` to the trigger set; with it `false`, this is byte-for-byte
--- what it was before `~` existed, so the plain (non-GFM) path's behavior is unchanged.
+-- `opts.gfmStrikethrough` and `opts.math` only add `~` and `$` to the trigger set; with both
+-- `false`, this is byte-for-byte what it was before either existed, so the plain (non-GFM,
+-- non-math) path's behavior is unchanged.
 def takePlainRun (opts : Options) (chars : List Char) : String × List Char :=
   let isTrigger (c : Char) : Bool :=
     c == '\\' || c == '`' || c == '&' || c == '<' || c == '[' || c == ']' ||
-    c == '!' || c == '*' || c == '_' || c == '\n' || (opts.gfmStrikethrough && c == '~')
+    c == '!' || c == '*' || c == '_' || c == '\n' || (opts.gfmStrikethrough && c == '~') ||
+    (opts.math && c == '$')
   let plain := chars.takeWhile (fun c => !isTrigger c)
   (String.ofList plain, chars.drop plain.length)
 
@@ -597,6 +607,53 @@ inductive INode where
   | closeBracketFail
   deriving Inhabited
 
+-- Math content reaches the output verbatim apart from line endings, which fold to spaces just
+-- as they do inside a code span. Unlike a code span there is no stripping of one surrounding
+-- space: `$ 4 $`'s content keeps both.
+def normalizeMathContent (raw : List Char) : String :=
+  String.ofList (raw.map (fun c => if c == '\n' then ' ' else c))
+
+-- Finds the run of `n` dollars closing a math span, returning how many characters of content
+-- precede it and what follows it. Mirrors md4c's mark analysis rather than scanning for the
+-- first same-length run: a closer there matches the *most recently* opened span, so the first
+-- open-eligible run encountered shadows this one and the scan fails (`$a $b$ c$` is `$a`, then
+-- math `b`, then ` c$`, not math `a $b` then ` c$`). Runs of three or more dollars are never
+-- delimiters and are passed over. Escapes, code spans and autolink/raw-HTML spans are skipped
+-- whole, since md4c resolves all three before `$` is looked at: the `$` in ``$a `$` b$`` is
+-- inside a code span and so never becomes a delimiter at all.
+def findMathEndF (n : Nat) :
+    Nat → Option Char → Nat → List Char → Option (Nat × List Char)
+  | 0, _, _, _ => none
+  | _ + 1, _, _, [] => none
+  | fuel + 1, _, k, '\\' :: c :: rest => findMathEndF n fuel (some c) (k + 2) rest
+  | fuel + 1, _, k, '`' :: rest =>
+    let openRun := ('`' :: rest).takeWhile (· == '`')
+    let afterOpen := ('`' :: rest).drop openRun.length
+    match findCodeSpanEnd openRun.length afterOpen with
+    | some (content, after) =>
+      findMathEndF n fuel (some '`') (k + 2 * openRun.length + content.length) after
+    | none => findMathEndF n fuel (some '`') (k + openRun.length) afterOpen
+  | fuel + 1, _, k, '<' :: rest =>
+    match matchAutolink rest with
+    | some (_, _, after) =>
+      findMathEndF n fuel (some '>') (k + 1 + (rest.length - after.length)) after
+    | none =>
+      match matchInlineHtml rest with
+      | some (_, after) =>
+        findMathEndF n fuel (some '>') (k + 1 + (rest.length - after.length)) after
+      | none => findMathEndF n fuel (some '<') (k + 1) rest
+  | fuel + 1, prev, k, '$' :: rest =>
+    let run := ('$' :: rest).takeWhile (· == '$')
+    let afterRun := ('$' :: rest).drop run.length
+    -- Closing is tested before opening, as in md4c: a run that could do either closes.
+    if run.length == n && mathCanClose afterRun.head? then some (k, afterRun)
+    else if run.length ≤ 2 && mathCanOpen prev then none
+    else findMathEndF n fuel (some '$') (k + run.length) afterRun
+  | fuel + 1, _, k, c :: rest => findMathEndF n fuel (some c) (k + 1) rest
+
+def findMathEnd (n : Nat) (chars : List Char) : Option (Nat × List Char) :=
+  findMathEndF n (chars.length + 1) (some '$') 0 chars
+
 def tokenizeF (defs : LinkDefs) (opts : Options) :
     Nat → List (Bool × List Char) → Option Char → List Char → List INode
   | 0, _, _, _ => []
@@ -676,6 +733,22 @@ def tokenizeF (defs : LinkDefs) (opts : Options) :
         .delim c run.length run.length co cc :: tokenizeF defs opts fuel stack (some c) afterRun
       else
         .text (String.ofList run) :: tokenizeF defs opts fuel stack run.getLast? afterRun
+    else if opts.math && c == '$' then
+      -- Resolved here rather than left as a `.delim` for `resolveEmphasis`, because a math
+      -- span's content is opaque: scanning it out now means the interior is never tokenized,
+      -- so nothing inside it has to be un-resolved afterwards the way md4c's own
+      -- `md_disable_marks` does. See `findMathEndF` for what that costs in fidelity.
+      let chars := c :: rest
+      let run := chars.takeWhile (· == c)
+      let afterRun := chars.drop run.length
+      if run.length ≤ 2 && mathCanOpen prev then
+        match findMathEnd run.length afterRun with
+        | some (k, after) =>
+          .resolved (.math (run.length == 2) (normalizeMathContent (afterRun.take k))) ::
+            tokenizeF defs opts fuel stack (some '$') after
+        | none => .text (String.ofList run) :: tokenizeF defs opts fuel stack (some '$') afterRun
+      else
+        .text (String.ofList run) :: tokenizeF defs opts fuel stack (some '$') afterRun
     else
       let (plain, rest') := takePlainRun opts (c :: rest)
       match rest' with
