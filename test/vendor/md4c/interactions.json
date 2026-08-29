@@ -1,0 +1,443 @@
+[
+  {
+    "markdown": "$ 4 $\n",
+    "html": "<p><x-equation> 4 </x-equation></p>\n",
+    "example": 1,
+    "start_line": 14,
+    "end_line": 20,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "2000$x$\n",
+    "html": "<p>2000$x$</p>\n",
+    "example": 2,
+    "start_line": 22,
+    "end_line": 28,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$x$2\n",
+    "html": "<p>$x$2</p>\n",
+    "example": 3,
+    "start_line": 30,
+    "end_line": 36,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$x$.\n",
+    "html": "<p><x-equation>x</x-equation>.</p>\n",
+    "example": 4,
+    "start_line": 38,
+    "end_line": 44,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": ".$x$\n",
+    "html": "<p>.<x-equation>x</x-equation></p>\n",
+    "example": 5,
+    "start_line": 46,
+    "end_line": 52,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "+$x$+\n",
+    "html": "<p>+<x-equation>x</x-equation>+</p>\n",
+    "example": 6,
+    "start_line": 54,
+    "end_line": 60,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "($x$)\n",
+    "html": "<p>(<x-equation>x</x-equation>)</p>\n",
+    "example": 7,
+    "start_line": 62,
+    "end_line": 68,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "a $x$ b\n",
+    "html": "<p>a <x-equation>x</x-equation> b</p>\n",
+    "example": 8,
+    "start_line": 70,
+    "end_line": 76,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "π$x$\n",
+    "html": "<p>π$x$</p>\n",
+    "example": 9,
+    "start_line": 78,
+    "end_line": 84,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$x$π\n",
+    "html": "<p>$x$π</p>\n",
+    "example": 10,
+    "start_line": 86,
+    "end_line": 92,
+    "section": "Flanking",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$1$2$3\n",
+    "html": "<p>$1$2$3</p>\n",
+    "example": 11,
+    "start_line": 96,
+    "end_line": 102,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$$a$$$\n",
+    "html": "<p>$$$a$$$</p>\n",
+    "example": 12,
+    "start_line": 104,
+    "end_line": 110,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$$$\n",
+    "html": "<p>$$$$</p>\n",
+    "example": 13,
+    "start_line": 112,
+    "end_line": 118,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$\n",
+    "html": "<p>$$</p>\n",
+    "example": 14,
+    "start_line": 120,
+    "end_line": 126,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$ $\n",
+    "html": "<p><x-equation> </x-equation></p>\n",
+    "example": 15,
+    "start_line": 128,
+    "end_line": 134,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$a$$\n",
+    "html": "<p><x-equation type=\"display\">a</x-equation></p>\n",
+    "example": 16,
+    "start_line": 136,
+    "end_line": 142,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$x$\n",
+    "html": "<p>$$x$</p>\n",
+    "example": 17,
+    "start_line": 144,
+    "end_line": 150,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$x$$\n",
+    "html": "<p>$x$$</p>\n",
+    "example": 18,
+    "start_line": 152,
+    "end_line": 158,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a$$b$$\n",
+    "html": "<p>$a$$b$$</p>\n",
+    "example": 19,
+    "start_line": 160,
+    "end_line": 166,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$a$b$\n",
+    "html": "<p>$$a$b$</p>\n",
+    "example": 20,
+    "start_line": 168,
+    "end_line": 174,
+    "section": "Run lengths",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a $$b$$\n",
+    "html": "<p>$a <x-equation type=\"display\">b</x-equation></p>\n",
+    "example": 21,
+    "start_line": 178,
+    "end_line": 184,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$a $b$\n",
+    "html": "<p>$$a <x-equation>b</x-equation></p>\n",
+    "example": 22,
+    "start_line": 186,
+    "end_line": 192,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a $b$ c$\n",
+    "html": "<p>$a <x-equation>b</x-equation> c$</p>\n",
+    "example": 23,
+    "start_line": 194,
+    "end_line": 200,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a b$ $c$\n",
+    "html": "<p><x-equation>a b</x-equation> <x-equation>c</x-equation></p>\n",
+    "example": 24,
+    "start_line": 202,
+    "end_line": 208,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$a $b$ c$$\n",
+    "html": "<p>$$a <x-equation>b</x-equation> c$$</p>\n",
+    "example": 25,
+    "start_line": 210,
+    "end_line": 216,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a $$b$ c$$\n",
+    "html": "<p>$a <x-equation type=\"display\">b$ c</x-equation></p>\n",
+    "example": 26,
+    "start_line": 218,
+    "end_line": 224,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a $$b$$ c$\n",
+    "html": "<p>$a <x-equation type=\"display\">b</x-equation> c$</p>\n",
+    "example": 27,
+    "start_line": 226,
+    "end_line": 232,
+    "section": "Opener stack",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a\\$b$\n",
+    "html": "<p><x-equation>a\\$b</x-equation></p>\n",
+    "example": 28,
+    "start_line": 236,
+    "end_line": 242,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "a\\$b$c$\n",
+    "html": "<p>a$b$c$</p>\n",
+    "example": 29,
+    "start_line": 244,
+    "end_line": 250,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "\\\\$x$\n",
+    "html": "<p>\\<x-equation>x</x-equation></p>\n",
+    "example": 30,
+    "start_line": 252,
+    "end_line": 258,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "\\$$x$\n",
+    "html": "<p>$<x-equation>x</x-equation></p>\n",
+    "example": 31,
+    "start_line": 260,
+    "end_line": 266,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "The cost is between \\$10 and 30$.\n",
+    "html": "<p>The cost is between $10 and 30$.</p>\n",
+    "example": 32,
+    "start_line": 268,
+    "end_line": 274,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$\\text{\\$}$\n",
+    "html": "<p><x-equation>\\text{\\$}</x-equation></p>\n",
+    "example": 33,
+    "start_line": 276,
+    "end_line": 282,
+    "section": "Escapes",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a `$` b$\n",
+    "html": "<p><x-equation>a `$` b</x-equation></p>\n",
+    "example": 34,
+    "start_line": 286,
+    "end_line": 292,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a `$ b$ c` d$\n",
+    "html": "<p><x-equation>a `$ b$ c` d</x-equation></p>\n",
+    "example": 35,
+    "start_line": 294,
+    "end_line": 300,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "`$a$`\n",
+    "html": "<p><code>$a$</code></p>\n",
+    "example": 36,
+    "start_line": 302,
+    "end_line": 308,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "`$a` $b$\n",
+    "html": "<p><code>$a</code> <x-equation>b</x-equation></p>\n",
+    "example": 37,
+    "start_line": 310,
+    "end_line": 316,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "a `$` b $c$\n",
+    "html": "<p>a <code>$</code> b <x-equation>c</x-equation></p>\n",
+    "example": 38,
+    "start_line": 318,
+    "end_line": 324,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a <https://x.com/$> b$\n",
+    "html": "<p><x-equation>a &lt;https://x.com/$&gt; b</x-equation></p>\n",
+    "example": 39,
+    "start_line": 326,
+    "end_line": 332,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a <b$> c$\n",
+    "html": "<p><x-equation>a &lt;b</x-equation>&gt; c$</p>\n",
+    "example": 40,
+    "start_line": 334,
+    "end_line": 340,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a <b $ c> d$\n",
+    "html": "<p><x-equation>a &lt;b </x-equation> c&gt; d$</p>\n",
+    "example": 41,
+    "start_line": 342,
+    "end_line": 348,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$[a](b)$\n",
+    "html": "<p><x-equation>[a](b)</x-equation></p>\n",
+    "example": 42,
+    "start_line": 350,
+    "end_line": 356,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "[$a](b)\n",
+    "html": "<p><a href=\"b\">$a</a></p>\n",
+    "example": 43,
+    "start_line": 358,
+    "end_line": 364,
+    "section": "Constructs resolved before math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$b<a>c$\n",
+    "html": "<p><x-equation>b&lt;a&gt;c</x-equation></p>\n",
+    "example": 44,
+    "start_line": 368,
+    "end_line": 374,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$*$\n",
+    "html": "<p><x-equation>*</x-equation></p>\n",
+    "example": 45,
+    "start_line": 376,
+    "end_line": 382,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a *b* c$\n",
+    "html": "<p><x-equation>a *b* c</x-equation></p>\n",
+    "example": 46,
+    "start_line": 384,
+    "end_line": 390,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a$ *b* $c$\n",
+    "html": "<p><x-equation>a</x-equation> <em>b</em> <x-equation>c</x-equation></p>\n",
+    "example": 47,
+    "start_line": 392,
+    "end_line": 398,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$a *b$$ c*\n",
+    "html": "<p><x-equation type=\"display\">a *b</x-equation> c*</p>\n",
+    "example": 48,
+    "start_line": 400,
+    "end_line": 406,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a $$$ b$\n",
+    "html": "<p><x-equation>a $$$ b</x-equation></p>\n",
+    "example": 49,
+    "start_line": 408,
+    "end_line": 414,
+    "section": "Content is opaque",
+    "extensions": "--flatex-math"
+  }
+]

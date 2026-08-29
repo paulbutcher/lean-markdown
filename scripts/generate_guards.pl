@@ -9,8 +9,25 @@ use utf8;
 use JSON::PP qw(decode_json);
 binmode(STDOUT, ':encoding(UTF-8)');
 
+# md4c's md2html renders a math span as a placeholder `<x-equation>` tag, which its own README
+# and spec file both disclaim as a fallback for renderers that can't typeset LaTeX. This
+# library emits the pandoc form instead (see `CommonMark.inlineNodes`), so the expected output
+# is translated here, at generation time, rather than by hand-editing the vendored file: the
+# `.txt` and `.json` under test/vendor/md4c stay byte-for-byte what upstream ships, and what
+# diverges from them is code you can read rather than expectations someone retyped.
+my $math_output = 0;
+if (@ARGV && $ARGV[0] eq '--math-output') { $math_output = 1; shift @ARGV; }
+
+sub translate_math {
+    my ($h) = @_;
+    $h =~ s{<x-equation type="display">(.*?)</x-equation>}{<span class="math display">\\[$1\\]</span>}gs;
+    $h =~ s{<x-equation>(.*?)</x-equation>}{<span class="math inline">\\($1\\)</span>}gs;
+    return $h;
+}
+
 my ($specfile, $checker, $import) = @ARGV;
-die "usage: generate_guards.pl <spec.json> [checker] [import]\n" unless defined $specfile;
+die "usage: generate_guards.pl [--math-output] <spec.json> [checker] [import]\n"
+    unless defined $specfile;
 $checker //= 'checkExample';
 $import //= 'CheckExample';
 
@@ -46,8 +63,9 @@ meta import $import
 HEADER
 
 for my $t (@$tests) {
+    my $html = $math_output ? translate_math($t->{html}) : $t->{html};
     print "#guard $checker " . $t->{example}
         . ' "' . lean_string($t->{section}) . '"'
         . ' "' . lean_string($t->{markdown}) . '"'
-        . ' "' . lean_string($t->{html}) . "\"\n";
+        . ' "' . lean_string($html) . "\"\n";
 }

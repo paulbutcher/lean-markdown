@@ -8,7 +8,8 @@ See [A (somewhat) formally verified implementation of Markdown](https://paulbutc
 
 ## Guarantees
 
-- **Conformant**: passes every test in the official CommonMark and cmark-gfm suites.
+- **Conformant**: passes every test in the official CommonMark and cmark-gfm suites, and
+  every test in md4c's suite for the optional LaTeX math extension.
 - **Total**: never panics or loops on any input, including adversarial input.
 - **Safe**: proved to never let an AST leaf's string content produce unescaped HTML 
   markup, or break out of an attribute.
@@ -60,6 +61,18 @@ renders:
 <li><input type="checkbox" disabled="" /> <del>Not</del> Still to do</li>
 </ul>
 ```
+
+LaTeX math is an optional extension, off by default and independent of GFM, so all four
+combinations are available through `parseDocumentWith`:
+
+```lean
+open CommonMark
+
+#eval renderHtml (parseDocumentWith { math := true } "$x^2$ and $$e=mc^2$$\n")
+-- <p><span class="math inline">\(x^2\)</span> and <span class="math display">\[e=mc^2\]</span></p>
+```
+
+It follows [md4c](https://github.com/mity/md4c)'s dialect; Output is the pandoc-style `<span class="math inline">\(...\)</span>`. `GFMarkdown` has the same `parseDocumentWith`, with GFM's own extensions enabled.
 
 For untrusted input, use `renderHtmlSafe` instead of `renderHtml`:
 

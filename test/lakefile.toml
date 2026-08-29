@@ -16,4 +16,6 @@ name = "TestData"
 globs = ["CheckExample", "SpecGuards", "ZipperLaws", "ParserLaws", "HtmlWellFormedness",
   "CheckExampleGfm", "GfmGuards", "GfmRegressionGuards", "GfmNonEmissionProperties",
   "GfmHtmlWellFormedness", "SanitizeSafety", "GfmSanitizeSafety", "SanitizeExamples",
+  "CheckExampleMath", "MathGuards", "MathInteractionGuards", "MathDivergenceGuards",
+  "MathProperties",
   "EntityReferenceExamples", "CaseFoldingExamples"]

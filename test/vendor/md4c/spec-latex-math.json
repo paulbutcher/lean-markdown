@@ -1,0 +1,56 @@
+[
+  {
+    "markdown": "$a+b=c$ Hello, world!\n",
+    "html": "<p><x-equation>a+b=c</x-equation> Hello, world!</p>\n",
+    "example": 1,
+    "start_line": 10,
+    "end_line": 16,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$foo $bar$ baz$$\n",
+    "html": "<p>$$foo <x-equation>bar</x-equation> baz$$</p>\n",
+    "example": 2,
+    "start_line": 20,
+    "end_line": 26,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "x$a+b=c$\n",
+    "html": "<p>x$a+b=c$</p>\n",
+    "example": 3,
+    "start_line": 30,
+    "end_line": 36,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$a+b=c$x\n",
+    "html": "<p>$a+b=c$x</p>\n",
+    "example": 4,
+    "start_line": 40,
+    "end_line": 46,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "This is a display equation: $$\\int_a^b x dx$$.\n",
+    "html": "<p>This is a display equation: <x-equation type=\"display\">\\int_a^b x dx</x-equation>.</p>\n",
+    "example": 5,
+    "start_line": 50,
+    "end_line": 56,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  },
+  {
+    "markdown": "$$\n\\int_a^b\nf(x) dx\n$$\n",
+    "html": "<p><x-equation type=\"display\"> \\int_a^b f(x) dx </x-equation></p>\n",
+    "example": 6,
+    "start_line": 60,
+    "end_line": 69,
+    "section": "LaTeX Math",
+    "extensions": "--flatex-math"
+  }
+]

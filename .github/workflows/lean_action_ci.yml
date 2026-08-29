@@ -12,12 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # md4c is the differential-testing oracle for the LaTeX math extension, and is built
-      # from source at a pinned tag. The runner image already provides gcc and make; cmake is
-      # md4c's build system, installed explicitly rather than relied on being preinstalled.
+      # md4c is the differential-testing oracle for the LaTeX math extension, built from source
+      # at the tag scripts/build_md4c.sh pins. The runner image already provides gcc and make;
+      # cmake is md4c's build system, installed explicitly rather than relied on being
+      # preinstalled.
       - name: Install md4c build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cmake
+
+      # Checks the expected output recorded in test/vendor/md4c against what md4c itself
+      # produces. `lake test` checks this library against those same recordings, so the two
+      # together are what pin the math extension to md4c's behaviour.
+      - name: Verify math expectations against md4c
+        run: |
+          scripts/build_md4c.sh
+          scripts/verify_md4c.pl test/vendor/md4c/spec-latex-math.json test/vendor/md4c/interactions.json
 
       - uses: leanprover/lean-action@v1

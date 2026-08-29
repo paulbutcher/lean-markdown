@@ -8,8 +8,14 @@ use utf8;
 binmode(STDIN, ':encoding(UTF-8)');
 binmode(STDOUT, ':encoding(UTF-8)');
 
+# md4c's extension suites end each example with a third section holding the md2html flags the
+# example needs (`--flatex-math`), where CommonMark's and cmark-gfm's have only two. Off by
+# default, so extraction of the two-section suites stays byte-identical.
+my $flags_section = 0;
+if (@ARGV && $ARGV[0] eq '--flags-section') { $flags_section = 1; shift @ARGV; }
+
 my ($specfile) = @ARGV;
-die "usage: extract_spec.pl <spec.txt>\n" unless defined $specfile;
+die "usage: extract_spec.pl [--flags-section] <spec.txt>\n" unless defined $specfile;
 
 open(my $fh, '<:encoding(UTF-8)', $specfile) or die "cannot open $specfile: $!";
 
@@ -40,7 +46,7 @@ while (my $line = <$fh>) {
     if ($l =~ /^(?:`{32}) example(?:\s+(.*))?$/) {
         $state = 1;
         $extensions = defined $1 ? $1 : '';
-    } elsif ($state == 2 && $l eq ('`' x 32)) {
+    } elsif (($state == 2 || $state == 3) && $l eq ('`' x 32)) {
         $state = 0;
         $example_number++;
         my $end_line = $line_number;
@@ -62,7 +68,9 @@ while (my $line = <$fh>) {
         @html_lines = ();
         $extensions = '';
     } elsif ($l eq '.') {
-        $state = 2;
+        $state = ($state == 2 && $flags_section) ? 3 : 2;
+    } elsif ($state == 3) {
+        $extensions = $l if $l ne '';
     } elsif ($state == 1) {
         $start_line = $line_number - 1 if $start_line == 0;
         push @markdown_lines, $line;

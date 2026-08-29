@@ -1,7 +1,7 @@
-# Vendored CommonMark / GFM specs
+# Vendored CommonMark / GFM / md4c specs
 
 Split by which variant each suite applies to: `CommonMark/` for the base CommonMark
-spec, `GFM/` for cmark-gfm's extension suites.
+spec, `GFM/` for cmark-gfm's extension suites, `md4c/` for the LaTeX math extension.
 
 ## `CommonMark/`
 
@@ -87,6 +87,41 @@ spec, `GFM/` for cmark-gfm's extension suites.
   globally, an axis this port doesn't model at all (there's no smart-punctuation pass in either
   `CommonMark` or `GFMarkdown`).
 
+## `md4c/`
+
+The LaTeX math extension follows md4c's dialect (`$...$`, `$$...$$`), so md4c is the
+reference implementation for it, as cmark is for `CommonMark/` and cmark-gfm for `GFM/`.
+
+- `spec-latex-math.txt` is md4c's own example suite for the extension (6 examples),
+  fetched verbatim from
+  https://github.com/mity/md4c/blob/release-0.5.3/test/spec-latex-math.txt.
+- `interactions.txt` (49 examples) is *authored here*, not vendored: md4c's own suite
+  covers none of the flanking corners, run-length matching, opener-stack behaviour, or
+  interaction with the constructs md4c resolves before `$`. Its expected output was
+  captured from `md2html --flatex-math` at the same tag.
+
+md4c's extension suites end each example with a third section holding the `md2html` flags
+it needs, where the CommonMark and cmark-gfm suites have only two, so extraction needs
+`--flags-section`. Guard generation needs `--math-output`, which rewrites md2html's
+placeholder `<x-equation>` tag into the pandoc-style `<span class="math inline">\(...\)</span>`
+this library emits. Doing that translation in the generator is what lets both `.txt` files
+keep md4c's own output verbatim: what differs from upstream is a script you can read rather
+than expectations somebody retyped.
+
+```
+scripts/extract_spec.pl --flags-section test/vendor/md4c/spec-latex-math.txt > test/vendor/md4c/spec-latex-math.json
+scripts/extract_spec.pl --flags-section test/vendor/md4c/interactions.txt > test/vendor/md4c/interactions.json
+scripts/generate_guards.pl --math-output test/vendor/md4c/spec-latex-math.json checkExampleMath CheckExampleMath > test/MathGuards.lean
+scripts/generate_guards.pl --math-output test/vendor/md4c/interactions.json checkExampleMath CheckExampleMath > test/MathInteractionGuards.lean
+```
+
+Both `.json` files are re-checked against md4c itself by `scripts/verify_md4c.pl`, which
+CI runs after building the oracle with `scripts/build_md4c.sh` (that script pins the md4c
+tag). Since `lake test` checks this library against the same recordings, the two together
+are what pin the extension to md4c's behaviour. The inputs where the two deliberately
+differ are deliberately absent from these files; they live in
+`test/MathDivergenceGuards.lean`, with `KNOWN_ISSUES.md` 4 and 5 for the reasons.
+
 ## License
 
 `spec.txt` (prose and embedded examples) is Copyright (c) 2014-16 John
@@ -98,5 +133,9 @@ CC-BY-SA 4.0 license per its own front matter. `regression.txt` and
 covered by cmark-gfm's project-wide `COPYING` (BSD-2-Clause-style, Copyright
 (c) 2014 John MacFarlane). `spec.json` is a mechanical extraction of the
 example pairs embedded in `spec.txt` and carries the same license as that
-file. None of these files contain source code from commonmark.js or
-cmark(-gfm).
+file. `spec-latex-math.txt` carries no license header of its own and is covered
+by md4c's project-wide `LICENSE.md` (MIT, Copyright (c) 2016-2024 Martin
+Mitáš); `interactions.txt` is original to this project and carries the
+project's own license. None of these files contain source code from
+commonmark.js, cmark(-gfm), or md4c.
+

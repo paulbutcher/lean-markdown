@@ -31,6 +31,29 @@ dangerous ones (`javascript:`, `data:`), since the allowlist errs toward rejecti
 anything not positively known to be safe. Not exercised by the vendored example suite
 (neither spec has a notion of "safe rendering"); see `test/SanitizeExamples.lean`.
 
+## 4. Math and emphasis that cross resolve differently from md4c
+
+The LaTeX math extension (`Options.math`) follows md4c's dialect, and matches it on every case in `test/vendor/md4c/` except one shape: a math span and an emphasis span that *cross*. md4c analyses `$` in the same left-to-right mark pass as `*`/`_`, so the span whose closing delimiter comes first wins, and `md_disable_marks` retroactively un-resolves whatever the winner swallowed. This library resolves a math span at tokenize time instead, the way it already resolves a code span, so math always wins:
+
+| input | md4c | here |
+| --- | --- | --- |
+| `*a $b* c$` | `<em>a $b</em> c$` | math containing `b* c` |
+| `$$a *b$$ c*` | display math `a *b` | same |
+| `$a *b* c$` | math containing `a *b*` | same |
+
+Only the first shape differs; nesting and the reverse crossing agree. Matching md4c exactly would mean rebuilding `resolveEmphasis` as a mark array with retroactive disabling, on the code the 652 CommonMark guards depend on, for inputs where md4c itself emits unmatched delimiters. Pinned in `test/MathDivergenceGuards.lean`.
+
+## 5. Delimiter flanking after an entity reference uses the decoded character
+
+`tokenizeF`'s `&` branch feeds the *decoded* entity text's last character into delimiter flanking, where md4c (and, reading the spec, cmark) uses the raw source character, which is always `;`. They differ only when an entity decodes to an alphanumeric:
+
+```
+&#65;_foo_    md4c: A<em>foo</em>    here: A_foo_
+&#65;$x$      md4c: A + math x       here: A$x$
+```
+
+Unlike the entries above this is a bug rather than a deliberate trade, and it is not math-specific: the `_` case has always behaved this way, and the math case is the same quirk reached through a new construct. It is recorded here rather than fixed because the fix changes core emphasis flanking, which the whole spec suite rests on, so it belongs in its own change with that suite as the guard. Both cases are pinned in `test/MathDivergenceGuards.lean`.
+
 ## Non-goals
 
 - **Smart punctuation** (cmark's `--smart` option: curly quotes, em/en dashes,

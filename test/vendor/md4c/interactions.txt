@@ -1,0 +1,414 @@
+# LaTeX Math interactions
+
+Cases md4c's own `spec-latex-math.txt` leaves uncovered: flanking corners, run-length
+matching, the opener-stack rule, and how math interacts with the constructs md4c resolves
+before it. Authored here rather than vendored, but every expected output below was captured
+from `md2html --flatex-math` at the pinned md4c tag, and `scripts/verify_md4c.pl` re-checks
+every one of them against that binary rather than trusting this file.
+
+Cases where this library deliberately differs from md4c are *not* here; they are pinned in
+`test/MathDivergenceGuards.lean` instead, with the reasons.
+
+## Flanking
+
+```````````````````````````````` example
+$ 4 $
+.
+<p><x-equation> 4 </x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+2000$x$
+.
+<p>2000$x$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$x$2
+.
+<p>$x$2</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$x$.
+.
+<p><x-equation>x</x-equation>.</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+.$x$
+.
+<p>.<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
++$x$+
+.
+<p>+<x-equation>x</x-equation>+</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+($x$)
+.
+<p>(<x-equation>x</x-equation>)</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+a $x$ b
+.
+<p>a <x-equation>x</x-equation> b</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+π$x$
+.
+<p>π$x$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$x$π
+.
+<p>$x$π</p>
+.
+--flatex-math
+````````````````````````````````
+
+## Run lengths
+
+```````````````````````````````` example
+$1$2$3
+.
+<p>$1$2$3</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$$a$$$
+.
+<p>$$$a$$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$$$
+.
+<p>$$$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$
+.
+<p>$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$ $
+.
+<p><x-equation> </x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$a$$
+.
+<p><x-equation type="display">a</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$x$
+.
+<p>$$x$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$x$$
+.
+<p>$x$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a$$b$$
+.
+<p>$a$$b$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$a$b$
+.
+<p>$$a$b$</p>
+.
+--flatex-math
+````````````````````````````````
+
+## Opener stack
+
+```````````````````````````````` example
+$a $$b$$
+.
+<p>$a <x-equation type="display">b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$a $b$
+.
+<p>$$a <x-equation>b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a $b$ c$
+.
+<p>$a <x-equation>b</x-equation> c$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a b$ $c$
+.
+<p><x-equation>a b</x-equation> <x-equation>c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$a $b$ c$$
+.
+<p>$$a <x-equation>b</x-equation> c$$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a $$b$ c$$
+.
+<p>$a <x-equation type="display">b$ c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a $$b$$ c$
+.
+<p>$a <x-equation type="display">b</x-equation> c$</p>
+.
+--flatex-math
+````````````````````````````````
+
+## Escapes
+
+```````````````````````````````` example
+$a\$b$
+.
+<p><x-equation>a\$b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+a\$b$c$
+.
+<p>a$b$c$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+\\$x$
+.
+<p>\<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+\$$x$
+.
+<p>$<x-equation>x</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+The cost is between \$10 and 30$.
+.
+<p>The cost is between $10 and 30$.</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$\text{\$}$
+.
+<p><x-equation>\text{\$}</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+## Constructs resolved before math
+
+```````````````````````````````` example
+$a `$` b$
+.
+<p><x-equation>a `$` b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a `$ b$ c` d$
+.
+<p><x-equation>a `$ b$ c` d</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+`$a$`
+.
+<p><code>$a$</code></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+`$a` $b$
+.
+<p><code>$a</code> <x-equation>b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+a `$` b $c$
+.
+<p>a <code>$</code> b <x-equation>c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a <https://x.com/$> b$
+.
+<p><x-equation>a &lt;https://x.com/$&gt; b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a <b$> c$
+.
+<p><x-equation>a &lt;b</x-equation>&gt; c$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a <b $ c> d$
+.
+<p><x-equation>a &lt;b </x-equation> c&gt; d$</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$[a](b)$
+.
+<p><x-equation>[a](b)</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+[$a](b)
+.
+<p><a href="b">$a</a></p>
+.
+--flatex-math
+````````````````````````````````
+
+## Content is opaque
+
+```````````````````````````````` example
+$b<a>c$
+.
+<p><x-equation>b&lt;a&gt;c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$*$
+.
+<p><x-equation>*</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a *b* c$
+.
+<p><x-equation>a *b* c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a$ *b* $c$
+.
+<p><x-equation>a</x-equation> <em>b</em> <x-equation>c</x-equation></p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$$a *b$$ c*
+.
+<p><x-equation type="display">a *b</x-equation> c*</p>
+.
+--flatex-math
+````````````````````````````````
+
+```````````````````````````````` example
+$a $$$ b$
+.
+<p><x-equation>a $$$ b</x-equation></p>
+.
+--flatex-math
+````````````````````````````````

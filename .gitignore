@@ -2,3 +2,4 @@
 /test/.lake
 # Generated on demand; the test package inherits the root toolchain.
 /test/lean-toolchain
+/build
