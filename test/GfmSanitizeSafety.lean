@@ -199,7 +199,8 @@ end
     `Block.noEmbeddedHtmlListF` answers `false` on, the second through the inline predicate it
     defers to, so `= true` is exactly "neither occurs". The reading is done at
     `Block.listCount doc + 1`, the depth this variant sanitizes at and the one `renderBlocks`
-    later reads at, so nothing is left unread and nothing has to be reconciled afterwards. -/
+    later reads at; `Document.noEmbeddedHtmlListF_saturate` (`GfmAstFuelLaws.lean`) shows that
+    fuel sufficient, no larger one giving a different answer. -/
 theorem Document.sanitize_noEmbeddedHtml (doc : Document) :
     Block.noEmbeddedHtmlListF (Block.listCount doc + 1) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc + 1) doc).1

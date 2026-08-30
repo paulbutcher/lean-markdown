@@ -483,7 +483,8 @@ end
     `CommonMark.renderHtml_wellFormed` for why it cannot be dropped.
 
     `doc.hasEmbeddedHtml = false` is the document-level form of the predicate the lemmas above
-    carry, saturated at a depth past the document's own so that nothing escapes it. The
+    carry, read at a fuel `Document.noEmbeddedHtmlListF_saturate` (`GfmAstFuelLaws.lean`) shows
+    sufficient, so the hypothesis cannot be satisfied by a reading that stopped short. The
     conclusion is about the rendered string rather than the node list, which is what
     `foldl_render_wellFormed` bridges, and at `.xhtml`, the dialect `renderHtml` uses,
     `Html.WellFormedHtml` also carries `Html.WellFormedAttrs`, making the claim well-formed XML

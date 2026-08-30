@@ -190,8 +190,9 @@ end
     The proposition says that because those two constructors are the only ones
     `Block.noEmbeddedHtmlListF` answers `false` on, the second through the inline predicate it
     defers to, so `= true` is exactly "neither occurs". Its first argument bounds how deep the
-    reading goes, and `Block.listCount doc` counts every block in `doc`, which is at least its
-    depth, so no part of the document goes unread. -/
+    reading goes, and `Document.noEmbeddedHtmlListF_saturate` (`AstFuelLaws.lean`) shows
+    `Block.listCount doc` sufficient: no larger fuel gives a different answer, so the verdict
+    here is not one reached by stopping short of something. -/
 theorem Document.sanitize_noEmbeddedHtml (doc : Document) :
     Block.noEmbeddedHtmlListF (Block.listCount doc) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc) doc).1

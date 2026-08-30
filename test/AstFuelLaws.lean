@@ -2,7 +2,7 @@
 -- Released under Apache 2.0 license as described in the file LICENSE.
 module
 
-public import CommonMark
+public import NoEmbeddedHtml
 
 @[expose] public section
 
@@ -223,5 +223,97 @@ theorem count_sanitizeBlock (b : Block) : Block.count (sanitizeBlock b) = Block.
 theorem Document.listCount_sanitize (doc : Document) :
     Block.listCount (Document.sanitize doc) = Block.listCount doc :=
   Block.listCount_mapListF sanitizeInline sanitizeBlock count_sanitizeBlock _ doc
+
+-- The same saturation, for the observation `NoEmbeddedHtml.lean` defines rather than for the
+-- map: the modules that read a document at a fuel of their own choosing need to know the
+-- reading does not depend on which sufficient fuel they chose.
+
+/-- Two tests that agree on every element of a list agree on the whole list.
+
+    The hypothesis is pointwise and only over the list's own elements, not over the type, which
+    is what the `.list` case below can supply: the two readings agree at each item's fuel, and
+    nowhere else need they agree at all. -/
+private theorem all_congr {α : Type} {f g : α → Bool} :
+    (l : List α) → (∀ a ∈ l, f a = g a) → l.all f = l.all g
+  | [], _ => rfl
+  | a :: rest, h => by
+    simp only [List.all_cons, h a (List.mem_cons_self ..)]
+    rw [all_congr rest (fun b hb => h b (List.mem_cons_of_mem _ hb))]
+
+mutual
+/-- Once the fuel is enough to reach every node, more fuel cannot change the verdict: a block
+    read at any sufficient fuel gets the same answer as at any other.
+
+    The counterpart of `Block.mapF_saturate` for the reading rather than the rewrite, and the
+    same shape: `n` and `m` are asked only to be sufficient, so the claim is that all
+    sufficient fuels agree. What it rules out is a `.htmlBlock` or `.htmlInline` sitting deeper
+    than the fuel reaches and going unnoticed, which is what would make a `= true` verdict
+    worthless. -/
+theorem Block.noEmbeddedHtmlF_saturate :
+    (n m : Nat) → (b : Block) → Block.count b ≤ n → Block.count b ≤ m →
+      Block.noEmbeddedHtmlF n b = Block.noEmbeddedHtmlF m b
+  | 0, _, b, hn, _ => by have := count_pos b; omega
+  | _ + 1, 0, b, _, hm => by have := count_pos b; omega
+  | n + 1, m + 1, b, hn, hm => by
+    match b with
+    | .paragraph _ => rfl
+    | .heading .. => rfl
+    | .codeBlock .. => rfl
+    | .thematicBreak => rfl
+    | .htmlBlock _ => rfl
+    | .blockQuote content =>
+      simp only [Block.count] at hn hm
+      simp only [Block.noEmbeddedHtmlF]
+      rw [Block.noEmbeddedHtmlListF_saturate n m content (by omega) (by omega)]
+    | .list kind tight items =>
+      simp only [Block.noEmbeddedHtmlF]
+      exact all_congr items (fun c hc =>
+        Block.noEmbeddedHtmlListF_saturate n m c
+          (listCount_le_of_list hn c hc) (listCount_le_of_list hm c hc))
+
+/-- The same for a list of blocks, which is the shape a `Document` has and so the form the
+    theorem below instantiates.
+
+    `Block.listCount bs ≤ n` and `≤ m` say each fuel is enough for the whole list, which by the
+    bound above is enough for every block within it. -/
+theorem Block.noEmbeddedHtmlListF_saturate :
+    (n m : Nat) → (bs : List Block) → Block.listCount bs ≤ n → Block.listCount bs ≤ m →
+      Block.noEmbeddedHtmlListF n bs = Block.noEmbeddedHtmlListF m bs
+  | 0, m, bs, hn, _ => by
+    match bs with
+    | [] => cases m <;> rfl
+    | b :: rest =>
+      simp only [Block.listCount] at hn
+      have := count_pos b
+      omega
+  | n + 1, 0, bs, _, hm => by
+    match bs with
+    | [] => rfl
+    | b :: rest =>
+      simp only [Block.listCount] at hm
+      have := count_pos b
+      omega
+  | n + 1, m + 1, bs, hn, hm => by
+    match bs with
+    | [] => rfl
+    | b :: rest =>
+      simp only [Block.listCount] at hn hm
+      simp only [Block.noEmbeddedHtmlListF]
+      rw [Block.noEmbeddedHtmlF_saturate n m b (by omega) (by omega),
+        Block.noEmbeddedHtmlListF_saturate n m rest (by omega) (by omega)]
+end
+
+/-- Reading a document for embedded raw HTML at its own node count settles the question: no
+    larger fuel gives a different answer, so a `= true` verdict there cannot have been reached
+    by stopping short of something.
+
+    `Block.listCount doc` counts every block in `doc` and the reading spends one unit of fuel
+    per level of nesting, so it is a sufficient fuel; the proposition says every fuel at least
+    that large agrees with it. This is what the theorems reading a sanitized document at that
+    fuel rest on. -/
+theorem Document.noEmbeddedHtmlListF_saturate (doc : Document) (n : Nat)
+    (h : Block.listCount doc ≤ n) :
+    Block.noEmbeddedHtmlListF n doc = Block.noEmbeddedHtmlListF (Block.listCount doc) doc :=
+  Block.noEmbeddedHtmlListF_saturate n (Block.listCount doc) doc h (Nat.le_refl _)
 
 end CommonMark

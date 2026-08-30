@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.1] - 2026-08-30
+
+* Every theorem now documents what it establishes and how its proposition says it
+* The fuel a raw-HTML reading is given is proved sufficient, where before it was only argued in a comment
+
 ## [0.7.0] - 2026-08-29
 
 * `renderHtmlSafe`'s output is now proved well-formed for every input, with no no-embedded-raw-HTML side condition
