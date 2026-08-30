@@ -83,6 +83,16 @@ Applies to published libraries. An application keeps its tests in the same packa
 - When changing a module that carries properties, re-ask whether each is now provable. A property is a fallback, not a resting place.
 - Theorems not needed by the production code belong in test code. They need no entry in a runner: compiling is passing.
 
+## Documenting theorems
+
+Applies to every theorem, `private` ones included, and overrides Commenting above for them; definitions still follow it.
+
+- Give each one a doc comment of two paragraphs, separated by a blank line.
+- The first says in plain English what the theorem establishes and why that is worth establishing. It stands alone: never "the same as above".
+- The second reads the proposition back term by term, saying what each predicate answers `true` to and what each argument does, and so why that statement is the property the first paragraph names.
+- Where an argument could make the proposition vacuously true, a depth bound for instance, say why it does not.
+- Where the reading rests on something nothing in the codebase proves, say that rather than asserting it.
+
 ## Lean code
 
 - Never use a partial function unless it is absolutely essential.

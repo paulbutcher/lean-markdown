@@ -18,9 +18,13 @@ open CommonMark.Parser (RawInline)
 
 open Html
 
-/-- Folding `.render` over a list of already-`WellFormed` nodes, starting from an
-    already-`WellFormedHtml` accumulator, stays `WellFormedHtml`. Identical in shape to
-    `CommonMark.foldl_render_wellFormed`; re-derived here since that one is `private`. -/
+/-- Rendering a list of well-formed nodes into a string leaves the string well-formed. This is
+    the step from a claim about nodes to a claim about `renderHtml`'s actual output.
+
+    The accumulator is quantified inside the conclusion, along with the assumption that it is
+    already well-formed, because the fold grows it as it goes; the top-level call starts it at
+    `""`. Identical in shape to `CommonMark.foldl_render_wellFormed`, re-derived because that
+    one is `private` to its module. -/
 private theorem foldl_render_wellFormed {cat : Category} (dialect : Dialect)
     (l : List (Node cat)) (h : ∀ n ∈ l, Node.WellFormed n) :
     ∀ acc, WellFormedHtml dialect acc →
@@ -35,8 +39,13 @@ private theorem foldl_render_wellFormed {cat : Category} (dialect : Dialect)
       (acc ++ n.render dialect)
       (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) dialect))
 
-/-- Membership in `if cond then A ++ [x] ++ B else A ++ B`, regardless of `cond`. Identical in
-    shape to `CommonMark.mem_ite_append`; re-derived here since that one is `private`. -/
+/-- Anything found in a list built by conditionally inserting `x` between `A` and `B` came from
+    `A`, is `x`, or came from `B`.
+
+    The conclusion says nothing about `cond`, which is the point: a caller holding a membership
+    hypothesis lets `cond`, `A`, `B` and `x` be fixed by unification instead of restating them.
+    Identical in shape to `CommonMark.mem_ite_append`, re-derived because that one is
+    `private`. -/
 private theorem mem_ite_append {α : Type} (cond : Bool) (A B : List α) (x n : α)
     (hn : n ∈ (if cond = true then A ++ [x] ++ B else A ++ B)) : n ∈ A ∨ n = x ∨ n ∈ B := by
   by_cases hc : cond = true
@@ -51,9 +60,12 @@ private theorem mem_ite_append {α : Type} (cond : Bool) (A B : List α) (x n : 
     · exact Or.inl hn
     · exact Or.inr (Or.inr hn)
 
-/-- Every element produced by `l.foldl (fun acc x => acc ++ f x) init` either came from
-    `init` or from `f x` for some `x ∈ l`. Identical in shape to `CommonMark.foldl_append_mem`;
-    re-derived here since that one is `private`. -/
+/-- Anything found in a list accumulated by `foldl` came from the initial accumulator or from
+    one of the pieces appended along the way.
+
+    Turning a membership in the folded result into a membership in a single `f x` is what lets
+    a per-item claim be applied to it. Identical in shape to `CommonMark.foldl_append_mem`,
+    re-derived because that one is `private`. -/
 private theorem foldl_append_mem {α β : Type} (f : α → List β) :
     (l : List α) → (init : List β) → ∀ y ∈ l.foldl (fun acc x => acc ++ f x) init,
       y ∈ init ∨ ∃ x ∈ l, y ∈ f x
@@ -67,8 +79,12 @@ private theorem foldl_append_mem {α β : Type} (f : α → List β) :
     · obtain ⟨x', hx', hy'⟩ := h
       exact Or.inr ⟨x', List.mem_cons_of_mem _ hx', hy'⟩
 
-/-- Every element produced by `interleaveNewlines l` is either a literal `"\n"` or came from
-    `l` itself. -/
+/-- Anything found in a list with newlines interleaved through it is either one of those
+    newlines or one of the original nodes.
+
+    The disjunction is all a well-formedness argument needs, since it never matters where in
+    the list a node ended up, only where it came from; positions would have to be tracked to
+    say more, and nothing here would use it. -/
 private theorem interleaveNewlines_mem {cat : Category} :
     (l : List (Node cat)) → ∀ c ∈ interleaveNewlines l, c = ("\n" : Node cat) ∨ c ∈ l
   | [], c, hc => Or.inl (List.mem_singleton.mp hc)
@@ -81,6 +97,13 @@ private theorem interleaveNewlines_mem {cat : Category} :
       · exact Or.inl hc'
       · exact Or.inr (List.mem_cons_of_mem _ hc')
 
+/-- Interleaving newlines through a list of well-formed nodes leaves every node in it
+    well-formed.
+
+    The conclusion is stated over the interleaved list rather than the original because that
+    is what the table constructors below hand to `Node.elementOf_wellFormed`; the added nodes
+    are text, which is well-formed unconditionally, so the hypothesis need only cover the
+    nodes that were already there. -/
 private theorem interleaveNewlines_wellFormed {cat : Category} (nodes : List (Node cat))
     (h : ∀ n ∈ nodes, Node.WellFormed n) : ∀ c ∈ interleaveNewlines nodes, Node.WellFormed c := by
   intro c hc
@@ -88,18 +111,39 @@ private theorem interleaveNewlines_wellFormed {cat : Category} (nodes : List (No
   · subst hc'; exact Node.text_wellFormed "\n"
   · exact h c hc'
 
+/-- A heading element is well-formed whenever its children are.
+
+    Quantifying over `level : Fin 6` covers all six tags in one claim, `headingNode` choosing
+    the tag by level and building every branch the same way, as phrasing children inside a flow
+    element; nothing but the children can decide the question, hence the single hypothesis. -/
 private theorem headingNode_wellFormed (level : Fin 6) (children : List (Node .phrasing))
     (h : ∀ c ∈ children, Node.WellFormed c) : Node.WellFormed (headingNode level children) := by
   unfold headingNode; split <;> exact Node.elementOf_wellFormed .flow .phrasing _ _ _ h
 
+/-- A `<ul>` is well-formed whenever its items are.
+
+    `attrs` carries no hypothesis because `Html.HtmlAttrs` is a typed record whose rendering is
+    a well-formed attribute run by construction; only the children can break the claim. -/
 private theorem ul_wellFormed (children : List (Node .listItem)) (attrs : Html.HtmlAttrs)
     (h : ∀ c ∈ children, Node.WellFormed c) : Node.WellFormed (Html.ul children attrs) := by
   unfold Html.ul; exact Node.elementOf_wellFormed .flow .listItem "ul" _ _ h
 
+/-- An `<ol>` is well-formed whenever its items are.
+
+    Stated separately from the `<ul>` claim because `Html.ol` takes `Html.OlAttrs`, a different
+    attribute type carrying `start`; as there, the attributes need no hypothesis and the
+    children need one. -/
 private theorem ol_wellFormed (children : List (Node .listItem)) (attrs : Html.OlAttrs)
     (h : ∀ c ∈ children, Node.WellFormed c) : Node.WellFormed (Html.ol children attrs) := by
   unfold Html.ol; exact Node.elementOf_wellFormed .flow .listItem "ol" _ _ h
 
+/-- The list element the renderer builds is well-formed whenever its items are, whichever kind
+    of list it is and whether or not it carries a `start`.
+
+    The proposition inlines the very `match` the renderer performs rather than naming a helper,
+    so it applies to the renderer's own expression; its three branches, `<ul>`, plain `<ol>`,
+    and `<ol start="n">`, are covered together, including the one whose attribute value is
+    computed from the list's starting number. -/
 private theorem listNode_wellFormed (kind : CommonMark.ListType) (children : List (Node .listItem))
     (h : ∀ c ∈ children, Node.WellFormed c) :
     Node.WellFormed (match kind with
@@ -113,9 +157,13 @@ private theorem listNode_wellFormed (kind : CommonMark.ListType) (children : Lis
     · simpa [hs] using ol_wellFormed children {} h
     · simpa [hs] using ol_wellFormed children { start := toString start } h
 
--- `checkboxNodes` only ever produces a void `<input>` (generically `WellFormed` regardless of
--- its `rawAttrs`, since `voidElement_wellFormed` doesn't care what's inside `Attrs.render`)
--- plus a literal `" "` text node.
+/-- The nodes a task-list checkbox renders to are well-formed, checked or unchecked.
+
+    `checked : Option Bool` covers all three cases at once, `none` producing no nodes at all
+    and making the claim vacuous there, which is right: a list item that is not a task item
+    gets no checkbox. What is produced is a void `<input>` and a literal space, and
+    `Node.voidElement_wellFormed` asks nothing of the element's attributes, so the raw
+    attribute run the renderer builds cannot break the claim. -/
 private theorem checkboxNodes_wellFormed (checked : Option Bool) :
     ∀ c ∈ checkboxNodes checked, Node.WellFormed c := by
   cases checked with
@@ -132,6 +180,13 @@ private theorem checkboxNodes_wellFormed (checked : Option Bool) :
 -- Mirrors `CommonMark.inlineNodes_wellFormed`/`inlineListNodes_wellFormed`'s own mutual
 -- structural recursion case-for-case, extended with the `.strikethrough`/`<del>` case.
 mutual
+/-- Rendering an inline node that carries no raw HTML yields only well-formed nodes.
+
+    The claim is about every node in the list `inlineNodes` returns, an inline being able to
+    render as more than one, `.lineBreak` giving both a `<br/>` and a newline. The hypothesis
+    travels down to a node's content in the recursive cases, `.strikethrough` and its `<del>`
+    among them, and does real work in exactly one place, `.htmlInline`, where it is
+    contradictory and the case closes. -/
 theorem inlineNodes_wellFormed :
     (i : RawInline) → RawInline.noEmbeddedHtml i = true → ∀ n ∈ inlineNodes i, Node.WellFormed n
   | .text s, _ => by
@@ -175,6 +230,12 @@ theorem inlineNodes_wellFormed :
       intro c hc; simp only [List.mem_singleton] at hc; subst hc
       split <;> exact Node.text_wellFormed _)
 
+/-- Rendering a list of inline nodes that carry no raw HTML yields only well-formed nodes.
+
+    `noEmbeddedHtmlList` is the conjunction over the elements and `inlineListNodes` is their
+    renderings concatenated, so membership splits into head and tail exactly as the hypothesis
+    does. This is the form the block and table cases need, all of which hold their content as
+    a `List RawInline`. -/
 theorem inlineListNodes_wellFormed :
     (l : List RawInline) → RawInline.noEmbeddedHtmlList l = true → ∀ n ∈ inlineListNodes l, Node.WellFormed n
   | [], _ => by intro n hn; simp [inlineListNodes] at hn
@@ -187,6 +248,12 @@ theorem inlineListNodes_wellFormed :
     · exact inlineListNodes_wellFormed rest h.2 n hn
 end
 
+/-- A table cell containing no raw HTML renders to a well-formed node.
+
+    `isHeader` and `alignment` carry no hypotheses: the first only chooses between `<th>` and
+    `<td>`, both built the same way, and the second only contributes a typed attribute, so
+    neither can affect well-formedness. The content hypothesis is the same one the inline
+    claim above needs, phrasing nodes being lifted into flow content within the cell. -/
 private theorem tableCellNode_wellFormed (isHeader : Bool) (alignment : CommonMark.Parser.TableAlignment)
     (content : List RawInline) (h : RawInline.noEmbeddedHtmlList content = true) :
     Node.WellFormed (tableCellNode isHeader alignment content) := by
@@ -200,7 +267,11 @@ private theorem tableCellNode_wellFormed (isHeader : Bool) (alignment : CommonMa
   · exact Node.elementOf_wellFormed .tableCell .flow "th" _ _ hchildren
   · exact Node.elementOf_wellFormed .tableCell .flow "td" _ _ hchildren
 
-/-- Every element produced by `List.zipWith f as bs` is `f a b` for some `a ∈ as`, `b ∈ bs`. -/
+/-- Anything found in a `zipWith` is the function applied to some element of each list.
+
+    The existentials are ordered so that the `b` drawn from the second list comes with its
+    membership proof while the `a` does not, which is what the caller needs: alignments are
+    zipped against cells, and it is the cell whose content the hypothesis is about. -/
 private theorem mem_zipWith {α β γ : Type} (f : α → β → γ) :
     (as : List α) → (bs : List β) → ∀ c ∈ List.zipWith f as bs, ∃ b ∈ bs, ∃ a, c = f a b
   | [], _, c, hc => by simp at hc
@@ -212,6 +283,11 @@ private theorem mem_zipWith {α β γ : Type} (f : α → β → γ) :
     · obtain ⟨b', hb', a', hceq⟩ := mem_zipWith f as bs c hc
       exact ⟨b', List.mem_cons_of_mem _ hb', a', hceq⟩
 
+/-- A table row whose cells contain no raw HTML renders to a well-formed node.
+
+    The hypothesis is per-cell rather than about the row as a whole, matching how the row is
+    built: cells are zipped against the column alignments, so the alignment list may be any
+    length without weakening the claim, and the newlines interleaved between cells are text. -/
 private theorem tableRowNode_wellFormed (isHeader : Bool) (alignments : List CommonMark.Parser.TableAlignment)
     (cells : List (List RawInline)) (h : ∀ content ∈ cells, RawInline.noEmbeddedHtmlList content = true) :
     Node.WellFormed (tableRowNode isHeader alignments cells) := by
@@ -222,6 +298,13 @@ private theorem tableRowNode_wellFormed (isHeader : Bool) (alignments : List Com
   obtain ⟨content, hcontent, alignment, hceq⟩ := mem_zipWith (tableCellNode isHeader) alignments cells c hc
   exact hceq ▸ tableCellNode_wellFormed isHeader alignment content (h content hcontent)
 
+/-- A table whose header and body cells contain no raw HTML renders to a well-formed node.
+
+    Header and rows carry separate hypotheses because the renderer treats them separately,
+    emitting a `<thead>` always and a `<tbody>` only when there are rows; both branches are
+    covered, so an empty-bodied table is included rather than excluded. The row hypothesis is
+    nested, per cell of per row, which is the shape `Block.noEmbeddedHtmlF` gives for a
+    `.table`. -/
 private theorem tableNode_wellFormed (header : List (List RawInline))
     (alignments : List CommonMark.Parser.TableAlignment) (rows : List (List (List RawInline)))
     (hheader : ∀ content ∈ header, RawInline.noEmbeddedHtmlList content = true)
@@ -260,6 +343,14 @@ private theorem tableNode_wellFormed (header : List (List RawInline))
 -- `tableNode_wellFormed`) and `.list`'s `(Option Bool × List Block)` items (via
 -- `checkboxNodes_wellFormed` alongside the existing `itemPrefix`/`renderBlocksNodeF` cases).
 mutual
+/-- Rendering a block that carries no raw HTML yields only well-formed nodes, at whatever depth
+    the renderer is working.
+
+    One `fuel` governs both the hypothesis and the rendering, so what is assumed clean is
+    exactly what will be visited; at fuel zero the renderer emits nothing and the claim is
+    empty rather than false. `tight` is unconstrained, both list-spacing modes being rendered
+    through the same constructors, and the constructors this variant adds are reached through
+    the table and checkbox claims above. -/
 theorem renderBlockNodesF_wellFormed :
     (tight : Bool) → (fuel : Nat) → (b : Block) → Block.noEmbeddedHtmlF fuel b = true →
       ∀ n ∈ renderBlockNodesF tight fuel b, Node.WellFormed n
@@ -364,6 +455,12 @@ theorem renderBlockNodesF_wellFormed :
     · subst hn; exact tableNode_wellFormed header alignments rows hheader hrows
     · subst hn; exact Node.text_wellFormed "\n"
 
+/-- Rendering a list of blocks that carry no raw HTML yields only well-formed nodes, at
+    whatever depth the renderer is working.
+
+    The shape a `Document` has, and so the form the theorem below instantiates. As above the
+    hypothesis and the rendering share one `fuel`, and the separator nodes the renderer inserts
+    between blocks are text, which is where `mem_ite_append` above is spent. -/
 theorem renderBlocksNodeF_wellFormed :
     (tight : Bool) → (fuel : Nat) → (bs : List Block) → Block.noEmbeddedHtmlListF fuel bs = true →
       ∀ n ∈ renderBlocksNodeF tight fuel bs, Node.WellFormed n
@@ -380,10 +477,17 @@ theorem renderBlocksNodeF_wellFormed :
     · exact renderBlocksNodeF_wellFormed tight fuel rest h.2 n hn
 end
 
-/-- If a `Document` embeds no raw HTML (`.htmlBlock`/`.htmlInline`), `renderHtml`'s output is
-    well-formed: balanced tags, with no stray `<`/`>` anywhere outside of tag delimiters. Same
-    shape and same necessary exclusion as `CommonMark.renderHtml_wellFormed`; see its own
-    doc comment for why the `hasEmbeddedHtml` precondition can't be dropped. -/
+/-- A document that embeds no raw HTML renders to well-formed HTML: balanced tags, no stray
+    `<` or `>` outside tag delimiters, and every attribute run a sequence of quoted
+    `name="value"` pairs. The exclusion is necessary, not a proof-technique limitation; see
+    `CommonMark.renderHtml_wellFormed` for why it cannot be dropped.
+
+    `doc.hasEmbeddedHtml = false` is the document-level form of the predicate the lemmas above
+    carry, saturated at a depth past the document's own so that nothing escapes it. The
+    conclusion is about the rendered string rather than the node list, which is what
+    `foldl_render_wellFormed` bridges, and at `.xhtml`, the dialect `renderHtml` uses,
+    `Html.WellFormedHtml` also carries `Html.WellFormedAttrs`, making the claim well-formed XML
+    rather than merely balanced HTML. -/
 theorem renderHtml_wellFormed (doc : Document) (h : doc.hasEmbeddedHtml = false) :
     Html.WellFormedHtml .xhtml (renderHtml doc) := by
   have h' : Block.noEmbeddedHtmlListF (Block.listCount doc + 1) doc = true := by

@@ -46,6 +46,13 @@ def Block.allDestsSafeListF : Nat → List Block → Bool
   | fuel + 1, b :: rest => Block.allDestsSafeF fuel b && Block.allDestsSafeListF fuel rest
 end
 
+/-- `sanitizeDest` never yields a destination unsafe to emit as an `href`/`src`, whatever it
+    is handed.
+
+    The proposition says that because `isSafeUriScheme` is this codebase's definition of safe
+    to emit, an allowlisted scheme or no scheme at all, and because `dest` is universally
+    quantified with no hypothesis on it: the claim covers hostile input, `javascript:alert(1)`
+    included, and not only input that was already safe. -/
 private theorem isSafeUriScheme_sanitizeDest (dest : String) :
     isSafeUriScheme (sanitizeDest dest) = true := by
   unfold sanitizeDest
@@ -57,6 +64,16 @@ private theorem isSafeUriScheme_sanitizeDest (dest : String) :
 -- case-for-case: `sanitizeInline`'s only special cases are `.htmlInline`/`.link`/`.image`,
 -- everything else passes through `Inline.map` unchanged.
 mutual
+/-- Sanitizing an inline node leaves no raw HTML and no unsafe destination anywhere within
+    it, at any depth.
+
+    The proposition says that of `Inline.map sanitizeInline i`, that is `i` with
+    `sanitizeInline` applied at every node, which is what ends up in the sanitized document;
+    `sanitizeInline i` alone would rewrite only the root. `Inline.noEmbeddedHtml` answers
+    `false` only at `.htmlInline` and otherwise recurses into `emph`/`strong`/`link`/`image`
+    content, so `= true` says none survives; `Inline.allDestsSafe` recurses the same way and
+    answers `isSafeUriScheme dest` at each `.link`/`.image`, so `= true` says every
+    destination in the tree is safe. -/
 theorem sanitizeInline_ok : (i : Inline) →
     Inline.noEmbeddedHtml (Inline.map sanitizeInline i) = true ∧
     Inline.allDestsSafe (Inline.map sanitizeInline i) = true
@@ -87,6 +104,14 @@ theorem sanitizeInline_ok : (i : Inline) →
     exact ⟨(sanitizeInlineList_ok content).1,
       isSafeUriScheme_sanitizeDest dest, (sanitizeInlineList_ok content).2⟩
 
+/-- Sanitizing a list of inline nodes leaves no raw HTML and no unsafe destination anywhere
+    within any of them, at any depth.
+
+    The proposition says that of `Inline.mapList sanitizeInline l` through the `...List`
+    predicates, which are the conjunctions of their node-level counterparts over the elements.
+    That is the form the claim above needs of a node's children, `Inline.map` descending into
+    them through `Inline.mapList`, and the form the block cases below need of `.paragraph` and
+    `.heading` content. -/
 theorem sanitizeInlineList_ok : (l : List Inline) →
     Inline.noEmbeddedHtmlList (Inline.mapList sanitizeInline l) = true ∧
     Inline.allDestsSafeList (Inline.mapList sanitizeInline l) = true
@@ -102,6 +127,15 @@ end
 -- (same shape `renderBlockNodesF_wellFormed` mirrors in `HtmlWellFormedness.lean`), proving
 -- both properties together since the case split is identical either way.
 mutual
+/-- Sanitizing a block leaves no raw HTML and no unsafe destination in it, as deep as the
+    sanitizing itself went.
+
+    The proposition says that of `Block.mapF ... fuel b`, `b` rewritten to a depth of `fuel`
+    levels, by running both checks at a depth of `fuel` levels too. Either check alone is weak,
+    since running out of levels makes it answer `true` without looking; the strength is in the
+    two numbers being the same one. `Block.mapF` and both predicates spend a level per level of
+    nesting over an identical case split, so a check stops exactly where the rewrite stopped,
+    and every node the rewrite could have altered is one the check looked at. -/
 theorem sanitizeBlockF_ok : (fuel : Nat) → (b : Block) →
     Block.noEmbeddedHtmlF fuel (Block.mapF sanitizeInline sanitizeBlock fuel b) = true ∧
     Block.allDestsSafeF fuel (Block.mapF sanitizeInline sanitizeBlock fuel b) = true
@@ -131,6 +165,13 @@ theorem sanitizeBlockF_ok : (fuel : Nat) → (b : Block) →
           | exact (sanitizeBlockListF_ok fuel c').1
           | exact (sanitizeBlockListF_ok fuel c').2
 
+/-- Sanitizing a list of blocks, which is what a `Document` is, leaves no raw HTML and no
+    unsafe destination in any of them, as deep as the sanitizing itself went.
+
+    `Document.sanitize doc` is by definition
+    `Block.mapListF sanitizeInline sanitizeBlock (Block.listCount doc) doc`, so the proposition
+    read at `fuel := Block.listCount doc` is already the two theorems below; leaving `fuel`
+    quantified is what lets other callers read it at a depth of their own. -/
 theorem sanitizeBlockListF_ok : (fuel : Nat) → (bs : List Block) →
     Block.noEmbeddedHtmlListF fuel (Block.mapListF sanitizeInline sanitizeBlock fuel bs) = true ∧
     Block.allDestsSafeListF fuel (Block.mapListF sanitizeInline sanitizeBlock fuel bs) = true
@@ -144,14 +185,25 @@ theorem sanitizeBlockListF_ok : (fuel : Nat) → (bs : List Block) →
 end
 
 /-- `Document.sanitize doc` embeds no raw HTML (`.htmlInline`/`.htmlBlock`): every leaf that
-    would otherwise reach `renderHtml`'s output through `Html.Node.unsafeRaw` has been
-    removed. -/
+    would otherwise reach `renderHtml`'s output through `Html.Node.unsafeRaw` has been removed.
+
+    The proposition says that because those two constructors are the only ones
+    `Block.noEmbeddedHtmlListF` answers `false` on, the second through the inline predicate it
+    defers to, so `= true` is exactly "neither occurs". Its first argument bounds how deep the
+    reading goes, and `Block.listCount doc` counts every block in `doc`, which is at least its
+    depth, so no part of the document goes unread. -/
 theorem Document.sanitize_noEmbeddedHtml (doc : Document) :
     Block.noEmbeddedHtmlListF (Block.listCount doc) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc) doc).1
 
 /-- Every `link`/`image` `dest` in `Document.sanitize doc` has a URI scheme in
-    `allowedUriSchemes` (or none at all, i.e. a relative reference). -/
+    `allowedUriSchemes` (or none at all, i.e. a relative reference), so nothing can reach an
+    `href`/`src` that `renderHtml`, which percent-encodes a destination but never inspects its
+    scheme, would pass through unexamined.
+
+    The proposition says that because `Block.allDestsSafeListF` answers `isSafeUriScheme dest`
+    at every `.link` and `.image` it reaches, nested inline content included, and `true`
+    elsewhere. -/
 theorem Document.sanitize_allDestsSafe (doc : Document) :
     Block.allDestsSafeListF (Block.listCount doc) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc) doc).2

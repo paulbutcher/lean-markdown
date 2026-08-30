@@ -17,6 +17,12 @@ namespace CommonMark
 def lowerString (s : String) : String :=
   String.ofList (s.toList.map Char.toLower)
 
+/-- A character whose lowercasing is a lower-case letter was a letter to begin with.
+
+    The hypothesis is about `c.toLower` and the conclusion about `c`, which is the direction
+    the caller needs: it knows only what lowercasing produced, and has to recover the shape of
+    what was written. `Char.toLower` moves nothing but `'A'`-`'Z'`, so `c` is either an
+    upper-case letter or unchanged, and `isAlpha` holds either way. -/
 private theorem isAlpha_of_toLower_isLower {c : Char} (h : c.toLower.isLower = true) :
     c.isAlpha = true := by
   by_cases hc : c.val ≥ 'A'.val ∧ c.val ≤ 'Z'.val
@@ -28,6 +34,11 @@ private theorem isAlpha_of_toLower_isLower {c : Char} (h : c.toLower.isLower = t
       exact absurd h' hc] at h
     simp [Char.isAlpha, h]
 
+/-- No letter is a control character, so `stripControlChars` never eats one.
+
+    `isUriControlChar` is "below `0x20`, or `0x7F`", and a letter's code point lies in 65-90 or
+    97-122, so both disjuncts fail. Stated as `= false` rather than as a negation because
+    `stripControlChars` filters on the `Bool`. -/
 private theorem isUriControlChar_eq_false_of_isAlpha {c : Char} (h : c.isAlpha = true) :
     isUriControlChar c = false := by
   simp only [Char.isAlpha, Char.isUpper, Char.isLower, Bool.or_eq_true, decide_eq_true_eq,
@@ -40,10 +51,22 @@ private theorem isUriControlChar_eq_false_of_isAlpha {c : Char} (h : c.isAlpha =
     beq_eq_false_iff_ne, Char.toNat]
   omega
 
+/-- Every letter is a scheme character, so `takeWhile isSchemeChar` cannot stop part way
+    through a scheme spelled with letters.
+
+    `isSchemeChar` admits alphanumerics and `'+'`, `'-'`, `'.'`, of which the letters are a
+    subset; the converse is false and is not wanted, a scheme being allowed digits too. -/
 private theorem isSchemeChar_of_isAlpha {c : Char} (h : c.isAlpha = true) :
     isSchemeChar c = true := by
   simp [isSchemeChar, Char.isAlphanum, h]
 
+/-- `takeWhile` stops at the first element that fails the test, so given a prefix that all
+    passes and an element that fails, it returns exactly that prefix.
+
+    The two hypotheses are the general form of "the scheme is all scheme characters" and "the
+    `':'` after it is not one". `l₂` carries no hypothesis because `takeWhile` never looks past
+    the element that stopped it, which is what makes the destination's arbitrary remainder
+    irrelevant. Nothing about URIs is used, hence the statement over any `α` and `p`. -/
 private theorem takeWhile_append_cons {α : Type} (p : α → Bool) (l₁ : List α) (x : α)
     (l₂ : List α) (h₁ : ∀ a ∈ l₁, p a = true) (hx : p x = false) :
     (l₁ ++ x :: l₂).takeWhile p = l₁ := by
@@ -53,9 +76,15 @@ private theorem takeWhile_append_cons {α : Type} (p : α → Bool) (l₁ : List
     simp only [List.cons_append, List.takeWhile_cons, h₁ a (List.mem_cons_self ..), reduceIte]
     rw [ih (fun b hb => h₁ b (List.mem_cons_of_mem _ hb))]
 
--- A scheme spelled with letters survives `stripControlChars` intact, so it is still there to
--- be found after the control characters an attacker might have hidden elsewhere in the
--- destination (`java\tscript:`) have been removed.
+/-- A destination written as a letters-only scheme, a colon, and anything at all has that
+    scheme found in it, even though control characters are stripped first.
+
+    `extractScheme` returns `some scheme` as written, not its lowercasing, leaving the casing
+    decision to `isSafeUriScheme`. `rest` is unconstrained, so control characters hidden
+    anywhere after the colon cannot dislodge what is found; the scheme itself survives the
+    strip because letters are never control characters. Requiring the scheme to be all letters
+    is stronger than RFC 3986, which also admits digits and `'+'`, `'-'`, `'.'`, but it is what
+    the schemes at issue need and what makes both steps above apply. -/
 private theorem extractScheme_append (scheme rest : String)
     (hne : scheme.toList ≠ [])
     (halpha : ∀ a ∈ scheme.toList, a.isAlpha = true) :
@@ -81,8 +110,13 @@ private theorem extractScheme_append (scheme rest : String)
       (by decide), List.drop_left, ← hs, String.ofList_toList]
     rfl
 
-/-- A scheme spelled with letters alone, whose lowercasing is not on the allowlist, is
-    rejected however it is capitalized. -/
+/-- A destination whose letters-only scheme is not on the allowlist is rejected, however it is
+    capitalized.
+
+    The hypothesis names `lowerString scheme`, not `scheme`, and that is the whole point: one
+    assumption about the lowercased form yields the conclusion for every casing that lowercases
+    to it, because `isSafeUriScheme` lowercases before consulting `allowedUriSchemes`. `rest`
+    is unconstrained, nothing after the colon being able to make an unlisted scheme safe. -/
 theorem not_isSafeUriScheme_of_alpha_scheme (scheme rest : String)
     (hne : scheme.toList ≠ [])
     (halpha : ∀ a ∈ scheme.toList, a.isAlpha = true)
@@ -91,8 +125,13 @@ theorem not_isSafeUriScheme_of_alpha_scheme (scheme rest : String)
   simp only [isSafeUriScheme, extractScheme_append scheme rest hne halpha]
   simpa [lowerString] using hno
 
-/-- Every casing of `javascript:` is rejected: the claim the mixed-case bypass rests on,
-    covering all of them rather than a sampled few. -/
+/-- Every casing of `javascript:` is rejected. This is the claim the mixed-case bypass would
+    have to break, and the one a filter that compares the scheme as written gets wrong.
+
+    `lowerString scheme = "javascript"` picks out exactly the strings that lowercase to it,
+    `JaVaScRiPt` among them, so the proposition covers every capitalization at once rather than
+    the few a sampled test would reach. `rest` is unconstrained, so the payload the URL carries
+    plays no part. -/
 theorem not_isSafeUriScheme_javascript (scheme rest : String)
     (h : lowerString scheme = "javascript") :
     isSafeUriScheme (scheme ++ ":" ++ rest) = false := by

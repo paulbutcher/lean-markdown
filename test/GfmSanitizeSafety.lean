@@ -49,9 +49,14 @@ def Block.allDestsSafeListF : Nat → List Block → Bool
   | fuel + 1, b :: rest => Block.allDestsSafeF fuel b && Block.allDestsSafeListF fuel rest
 end
 
--- Re-derived here (rather than reused) since `CommonMark.isSafeUriScheme_sanitizeDest` is
--- `private` to `SanitizeSafety.lean`; same reason `HtmlWellFormedness.lean`'s helper lemmas
--- are re-derived in `GfmHtmlWellFormedness.lean`.
+/-- `sanitizeDest` never yields a destination unsafe to emit as an `href`/`src`, whatever it is
+    handed.
+
+    The same claim `SanitizeSafety.lean` proves, re-derived because that copy is `private` to
+    its module; this variant reuses `CommonMark`'s destination sanitizer and allowlist, so the
+    statement is about `CommonMark.sanitizeDest` rather than one of its own. It is what
+    discharges the `.link` and `.image` cases below, where nothing is known about the original
+    destination. -/
 private theorem isSafeUriScheme_sanitizeDest (dest : String) :
     CommonMark.isSafeUriScheme (CommonMark.sanitizeDest dest) = true := by
   unfold CommonMark.sanitizeDest
@@ -62,6 +67,14 @@ private theorem isSafeUriScheme_sanitizeDest (dest : String) :
 -- Mirrors `sanitizeInline`/`sanitizeInlineList`'s own structural (fuel-free) mutual
 -- recursion case-for-case, extended with the `.strikethrough` case.
 mutual
+/-- Sanitizing an inline node leaves no raw HTML and no unsafe destination anywhere within it,
+    at any depth.
+
+    `RawInline.noEmbeddedHtml` answers `false` only at `.htmlInline` and otherwise recurses
+    into content, so `= true` says none survives; `RawInline.allDestsSafe` recurses the same
+    way and answers `isSafeUriScheme dest` at each `.link`/`.image`. Both sides name
+    `sanitizeInline` itself, not a traversal applied to it, this variant's sanitizer doing its
+    own recursion; `.strikethrough` carries content like `emph` and is covered with it. -/
 theorem sanitizeInline_ok : (i : RawInline) →
     RawInline.noEmbeddedHtml (sanitizeInline i) = true ∧
     RawInline.allDestsSafe (sanitizeInline i) = true
@@ -89,6 +102,13 @@ theorem sanitizeInline_ok : (i : RawInline) →
     exact ⟨(sanitizeInlineList_ok content).1,
       isSafeUriScheme_sanitizeDest dest, (sanitizeInlineList_ok content).2⟩
 
+/-- Sanitizing a list of inline nodes leaves no raw HTML and no unsafe destination anywhere
+    within any of them, at any depth.
+
+    The `...List` predicates are the conjunctions of their node-level counterparts over the
+    elements. `sanitizeInline` reaches a node's children through `sanitizeInlineList`, so the
+    claim above holds only as far as this one does; it is also the form `.paragraph`,
+    `.heading` and `.table` cells need. -/
 theorem sanitizeInlineList_ok : (l : List RawInline) →
     RawInline.noEmbeddedHtmlList (sanitizeInlineList l) = true ∧
     RawInline.allDestsSafeList (sanitizeInlineList l) = true
@@ -104,6 +124,13 @@ end
 -- recursion case-for-case, extended with `.table` and `.list`'s `(Option Bool × List Block)`
 -- items.
 mutual
+/-- Sanitizing a block leaves no raw HTML and no unsafe destination in it, as deep as the
+    sanitizing itself went.
+
+    One `fuel` governs both the rewrite and the two checks, which is what makes the checks
+    non-vacuous: they descend in step, so a check stops exactly where the rewrite stopped. The
+    constructors this variant adds are covered by the same claim, a `.table`'s cells and a
+    list item's blocks being reached through the inline and block claims already stated. -/
 theorem sanitizeBlockF_ok : (fuel : Nat) → (b : Block) →
     Block.noEmbeddedHtmlF fuel (sanitizeBlockF fuel b) = true ∧
     Block.allDestsSafeF fuel (sanitizeBlockF fuel b) = true
@@ -147,6 +174,12 @@ theorem sanitizeBlockF_ok : (fuel : Nat) → (b : Block) →
       obtain ⟨c, _, rfl⟩ := hc
       exact (sanitizeInlineList_ok c).2
 
+/-- Sanitizing a list of blocks, which is what a `Document` is, leaves no raw HTML and no
+    unsafe destination in any of them, as deep as the sanitizing itself went.
+
+    `Document.sanitize doc` is by definition `sanitizeBlockListF (Block.listCount doc + 1) doc`,
+    so this proposition read at that fuel is already the two theorems below; leaving `fuel`
+    quantified is what lets other callers read it at a depth of their own. -/
 theorem sanitizeBlockListF_ok : (fuel : Nat) → (bs : List Block) →
     Block.noEmbeddedHtmlListF fuel (sanitizeBlockListF fuel bs) = true ∧
     Block.allDestsSafeListF fuel (sanitizeBlockListF fuel bs) = true
@@ -159,13 +192,26 @@ theorem sanitizeBlockListF_ok : (fuel : Nat) → (bs : List Block) →
       (sanitizeBlockF_ok fuel b).2, (sanitizeBlockListF_ok fuel rest).2⟩
 end
 
-/-- `Document.sanitize doc` embeds no raw HTML (`.htmlInline`/`.htmlBlock`). -/
+/-- `Document.sanitize doc` embeds no raw HTML (`.htmlInline`/`.htmlBlock`): every leaf that
+    would otherwise reach `renderHtml`'s output through `Html.Node.unsafeRaw` has been removed.
+
+    The proposition says that because those two constructors are the only ones
+    `Block.noEmbeddedHtmlListF` answers `false` on, the second through the inline predicate it
+    defers to, so `= true` is exactly "neither occurs". The reading is done at
+    `Block.listCount doc + 1`, the depth this variant sanitizes at and the one `renderBlocks`
+    later reads at, so nothing is left unread and nothing has to be reconciled afterwards. -/
 theorem Document.sanitize_noEmbeddedHtml (doc : Document) :
     Block.noEmbeddedHtmlListF (Block.listCount doc + 1) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc + 1) doc).1
 
 /-- Every `link`/`image` `dest` in `Document.sanitize doc` has a URI scheme in
-    `CommonMark.allowedUriSchemes` (or none at all, i.e. a relative reference). -/
+    `CommonMark.allowedUriSchemes` (or none at all, i.e. a relative reference), so nothing can
+    reach an `href`/`src` that `renderHtml`, which percent-encodes a destination but never
+    inspects its scheme, would pass through unexamined.
+
+    The proposition says that because `Block.allDestsSafeListF` answers `isSafeUriScheme dest`
+    at every `.link` and `.image` it reaches, `.table` cells and list items included, and
+    `true` elsewhere. -/
 theorem Document.sanitize_allDestsSafe (doc : Document) :
     Block.allDestsSafeListF (Block.listCount doc + 1) (Document.sanitize doc) = true :=
   (sanitizeBlockListF_ok (Block.listCount doc + 1) doc).2

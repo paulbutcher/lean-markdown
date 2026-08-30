@@ -11,8 +11,14 @@ public import CommonMark
 
 namespace CommonMark.Parser
 
--- `normalizeGo` only ever writes `'\n'` or an already-given character to its accumulator,
--- never `'\r'`, so its output is `'\r'`-free regardless of input.
+/-- `normalizeGo` never leaves a `'\r'` behind, whatever it is given, since it only ever writes
+    `'\n'` or an already-given character to its accumulator.
+
+    The proposition quantifies over the accumulator as well as the input, with the hypothesis
+    that the accumulator is already `'\r'`-free, because that is what an induction over
+    `normalizeGo`'s own recursion needs: each step extends the accumulator, so the claim has to
+    be about every reachable state, not only the empty start. `normalizeNewlines_idem` below
+    instantiates it at `acc := []`, where the hypothesis is vacuous. -/
 theorem normalizeGo_no_cr (acc l : List Char) (hacc : ∀ c ∈ acc, c ≠ '\r') :
     ∀ c ∈ normalizeGo acc l, c ≠ '\r' := by
   induction acc, l using normalizeGo.induct with
@@ -41,8 +47,13 @@ theorem normalizeGo_no_cr (acc l : List Char) (hacc : ∀ c ∈ acc, c ≠ '\r')
     · rw [hc']; exact hcne
     · exact hacc c' hc'
 
--- A `'\r'`-free input passes through unchanged (up to the accumulator prefix): there's
--- nothing left for `normalizeGo` to rewrite.
+/-- A `'\r'`-free input passes through `normalizeGo` unchanged: there is nothing left to
+    rewrite.
+
+    The right-hand side is `acc.reverse ++ l` rather than `l` because `normalizeGo` builds its
+    result reversed in the accumulator and reverses at the end; at `acc := []`, where the
+    theorem below uses it, that is exactly `l`. The hypothesis is on the input alone, no
+    condition on `acc` being needed, since untouched input is copied whatever preceded it. -/
 theorem normalizeGo_eq_of_no_cr (acc l : List Char) (hl : ∀ c ∈ l, c ≠ '\r') :
     normalizeGo acc l = acc.reverse ++ l := by
   induction acc, l using normalizeGo.induct with
@@ -55,8 +66,13 @@ theorem normalizeGo_eq_of_no_cr (acc l : List Char) (hl : ∀ c ∈ l, c ≠ '\r
     rw [ih hrest]
     simp [List.reverse_cons]
 
--- Idempotence: normalizing an already-normalized document is a no-op, since normalization
--- only ever removes `'\r'` and there's none left after the first pass.
+/-- Normalizing an already-normalized document is a no-op, so nothing downstream has to care
+    how many times normalization ran.
+
+    Idempotence is the strongest form this claim admits without saying what normalization
+    does, and the two theorems above are what make the proposition true rather than merely
+    plausible: the first says a pass leaves no `'\r'`, the second says a `'\r'`-free input
+    survives a pass intact. -/
 theorem normalizeNewlines_idem (s : String) :
     normalizeNewlines (normalizeNewlines s) = normalizeNewlines s := by
   simp only [normalizeNewlines]

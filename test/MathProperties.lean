@@ -11,11 +11,14 @@ meta import Plausible
 
 namespace CommonMark.Parser
 
--- `normalizeMathContent` maps line endings to spaces and leaves everything else alone. The
--- neighbouring `normalizeCodeSpanContent` additionally strips one surrounding space, and
--- copying that here would be wrong: md4c keeps both spaces of `$ 4 $`. Stating the invariant
--- as a length equality is what makes that mistake fail to compile rather than fail a guard,
--- since any stripping rule shortens some input.
+/-- `normalizeMathContent` maps line endings to spaces and leaves everything else alone. The
+    neighbouring `normalizeCodeSpanContent` additionally strips one surrounding space, and
+    copying that here would be wrong: md4c keeps both spaces of `$ 4 $`.
+
+    The proposition is a length equality, which is weaker than saying what the output is but
+    stronger where it counts: any stripping rule shortens some input, so smuggling one in
+    fails to compile rather than merely failing a guard. It says nothing about which
+    characters were substituted, that being the part no invariant here needs to pin down. -/
 theorem normalizeMathContent_length (raw : List Char) :
     (normalizeMathContent raw).length = raw.length := by
   simp [normalizeMathContent]
