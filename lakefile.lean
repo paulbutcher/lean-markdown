@@ -11,7 +11,7 @@ require html from git "https://github.com/paulbutcher/lean-html" @ "v0.10.0"
 
 require UnicodeBasic from git
   "https://github.com/fgdorais/lean4-unicode-basic.git" @
-  "bbb75c5c9b7f30d5e397f27bd099655aed7db410"
+  "v2.0.4"
 
 @[default_target]
 lean_lib CommonMark
