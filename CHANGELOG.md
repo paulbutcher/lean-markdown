@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.0] - 2026-10-06
+
+* Lean v4.34.1
+* lean-html v0.10.0, under which `a` and `del` take the category of their context
+* UnicodeBasic is pinned to its v2.0.4 release rather than a commit
+
 ## [0.7.1] - 2026-08-30
 
 * Every theorem now documents what it establishes and how its proposition says it
