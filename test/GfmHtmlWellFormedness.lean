@@ -207,7 +207,7 @@ theorem inlineNodes_wellFormed :
   | .link _ _ content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     simp only [RawInline.noEmbeddedHtml] at h
-    exact Node.element_wellFormed .phrasing "a" _ _ (inlineListNodes_wellFormed content h)
+    exact Node.transparentElement_wellFormed .phrasing "a" _ _ (inlineListNodes_wellFormed content h)
   | .image .., _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     exact Node.voidElement_wellFormed .phrasing "img" _
@@ -223,7 +223,7 @@ theorem inlineNodes_wellFormed :
   | .strikethrough content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     simp only [RawInline.noEmbeddedHtml] at h
-    exact Node.element_wellFormed .phrasing "del" _ _ (inlineListNodes_wellFormed content h)
+    exact Node.transparentElement_wellFormed .phrasing "del" _ _ (inlineListNodes_wellFormed content h)
   | .math .., _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     exact Node.element_wellFormed .phrasing "span" _ _ (by
