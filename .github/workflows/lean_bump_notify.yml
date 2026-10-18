@@ -1,0 +1,16 @@
+name: Lean Bump Notify
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: paulbutcher/lean-bump/notify@v1
+        with:
+          token: ${{ secrets.LEAN_BUMP_TOKEN }}
