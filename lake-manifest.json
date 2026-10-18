@@ -1,4 +1,4 @@
-{"version": "1.2.0",
+{"version": "1.3.0",
  "packagesDir": ".lake/packages",
  "packages":
  [{"url": "https://github.com/fgdorais/lean4-unicode-basic.git",
@@ -15,10 +15,10 @@
    "type": "git",
    "subDir": null,
    "scope": "",
-   "rev": "56d842fe8b1f05028b0b5083fc25270235f19857",
+   "rev": "98ab27d4f0006dd0574ec5e3e8002cc6064c659e",
    "name": "html",
    "manifestFile": "lake-manifest.json",
-   "inputRev": "v0.10.0",
+   "inputRev": "v0.10.1",
    "inherited": false,
    "configFile": "lakefile.lean"}],
  "name": "markdown",
