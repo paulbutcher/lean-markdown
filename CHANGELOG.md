@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.1] - 2026-10-18
+
+* Chore: bump dependencies
+
 ## [0.8.0] - 2026-10-06
 
 * Lean v4.34.1
