@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.2] - 2026-10-30
+
+* lean-html v0.12.0
+
 ## [0.8.1] - 2026-10-18
 
 * Chore: bump dependencies
