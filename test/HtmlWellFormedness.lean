@@ -97,10 +97,10 @@ theorem inlineNodes_wellFormed :
   | .link _ _ content, h => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
     simp only [Inline.noEmbeddedHtml] at h
-    exact Node.transparentElement_wellFormed .phrasing "a" _ _ (inlineListNodes_wellFormed content h)
+    exact Node.transparentElement_wellFormed .phrasing "a" _ _ _ .nil (inlineListNodes_wellFormed content h)
   | .image .., _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
-    exact Node.voidElement_wellFormed .phrasing "img" _
+    exact Node.widen_wellFormed (Node.voidElement_wellFormed .image "img" _)
   | .htmlInline _, h => by simp [Inline.noEmbeddedHtml] at h
   | .softBreak, _ => by
     intro n hn; simp only [inlineNodes, List.mem_singleton] at hn; subst hn
@@ -141,7 +141,7 @@ end
     element; nothing but the children can decide the question, hence the single hypothesis. -/
 private theorem headingNode_wellFormed (level : Fin 6) (children : List (Node .phrasing))
     (h : ∀ c ∈ children, Node.WellFormed c) : Node.WellFormed (headingNode level children) := by
-  unfold headingNode; split <;> exact Node.elementOf_wellFormed .flow .phrasing _ _ _ h
+  unfold headingNode; split <;> exact Node.widen_wellFormed (Node.elementOf_wellFormed .heading .phrasing _ _ _ h)
 
 /-- A `<ul>` is well-formed whenever its items are.
 
@@ -221,20 +221,21 @@ theorem renderBlockNodesF_wellFormed :
     split
     · intro n hn
       obtain ⟨n', hn', hneq⟩ := List.mem_map.mp hn
-      exact hneq ▸ Node.toFlow_wellFormed (inlineListNodes_wellFormed content h n' hn')
+      exact hneq ▸ Node.widen_wellFormed (inlineListNodes_wellFormed content h n' hn')
     · intro n hn
       simp only [List.mem_cons, List.not_mem_nil, or_false] at hn
       rcases hn with hn | hn
       · subst hn
-        exact Node.elementOf_wellFormed .flow .phrasing "p" _ _ (inlineListNodes_wellFormed content h)
-      · subst hn; exact Node.text_wellFormed "\n"
+        exact Node.widen_wellFormed
+          (Node.elementOf_wellFormed .paragraph .phrasing "p" _ _ (inlineListNodes_wellFormed content h))
+      · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
   | _, _ + 1, .heading level content, h => by
     simp only [Block.noEmbeddedHtmlF] at h
     intro n hn
     simp only [renderBlockNodesF, List.mem_cons, List.not_mem_nil, or_false] at hn
     rcases hn with hn | hn
     · subst hn; exact headingNode_wellFormed level _ (inlineListNodes_wellFormed content h)
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
   | _, _ + 1, .codeBlock _ literal, _ => by
     intro n hn
     unfold renderBlockNodesF at hn
@@ -246,13 +247,13 @@ theorem renderBlockNodesF_wellFormed :
         exact Node.element_wellFormed .phrasing "code" _ _ (by
           intro c' hc'; simp only [List.mem_singleton] at hc'; subst hc'
           exact Node.text_wellFormed literal))
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
   | _, _ + 1, .thematicBreak, _ => by
     intro n hn
     simp only [renderBlockNodesF, List.mem_cons, List.not_mem_nil, or_false] at hn
     rcases hn with hn | hn
     · subst hn; exact Node.voidElement_wellFormed .flow "hr" _
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
   | _, _ + 1, .htmlBlock _, h => by simp [Block.noEmbeddedHtmlF] at h
   | _, fuel + 1, .blockQuote content, h => by
     simp only [Block.noEmbeddedHtmlF] at h
@@ -264,9 +265,9 @@ theorem renderBlockNodesF_wellFormed :
         intro c hc
         simp only [List.mem_cons] at hc
         rcases hc with hc | hc
-        · subst hc; exact Node.text_wellFormed "\n"
+        · subst hc; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
         · exact renderBlocksNodeF_wellFormed false fuel content h c hc)
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
   | _, fuel + 1, .list kind isTight items, h => by
     simp only [Block.noEmbeddedHtmlF] at h
     have hitems : ∀ c ∈ items, Block.noEmbeddedHtmlListF fuel c = true := List.all_eq_true.mp h
@@ -277,29 +278,29 @@ theorem renderBlockNodesF_wellFormed :
         intro c hc
         simp only [List.mem_append] at hc
         rcases hc with hc | hc
-        · unfold itemPrefix at hc; split at hc <;> simp_all [Node.text_wellFormed]
+        · unfold itemPrefix at hc; split at hc <;> simp_all [Node.widen_wellFormed, Node.text_wellFormed]
         · exact renderBlocksNodeF_wellFormed isTight fuel content (hitems content hcontent) c hc)
-    have hitemNodes : ∀ c ∈ (("\n" : Node .listItem) ::
-        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, "\n"]) []),
+    have hitemNodes : ∀ c ∈ ((Whitespace.newline : Node .listItem) ::
+        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, Whitespace.newline]) []),
         Node.WellFormed c := by
       intro c hc
       simp only [List.mem_cons] at hc
       rcases hc with hc | hc
-      · subst hc; exact Node.text_wellFormed "\n"
-      · rcases foldl_append_mem (fun content => [itemNode isTight fuel content, "\n"]) items [] c hc
+      · subst hc; exact Node.whitespace_wellFormed _
+      · rcases foldl_append_mem (fun content => [itemNode isTight fuel content, Whitespace.newline]) items [] c hc
           with hc' | ⟨content, hcontent, hc'⟩
         · simp at hc'
         · simp only [List.mem_cons, List.not_mem_nil, or_false] at hc'
           rcases hc' with hc' | hc'
           · subst hc'; exact hitemNode content hcontent
-          · subst hc'; exact Node.text_wellFormed "\n"
+          · subst hc'; exact Node.whitespace_wellFormed _
     intro n hn
     unfold renderBlockNodesF at hn
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hn
     rcases hn with hn | hn
     · subst hn
       exact listNode_wellFormed kind _ hitemNodes
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
 
 /-- Rendering a list of blocks that carry no raw HTML yields only well-formed nodes, at
     whatever depth the renderer is working.
@@ -319,7 +320,7 @@ theorem renderBlocksNodeF_wellFormed :
     intro n hn
     rcases mem_ite_append _ _ _ _ _ hn with hn | hn | hn
     · exact renderBlockNodesF_wellFormed tight fuel b h.1 n hn
-    · subst hn; exact Node.text_wellFormed "\n"
+    · subst hn; exact Node.widen_wellFormed (Node.text_wellFormed "\n")
     · exact renderBlocksNodeF_wellFormed tight fuel rest h.2 n hn
 end
 
