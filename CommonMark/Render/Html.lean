@@ -137,10 +137,8 @@ def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.N
 -- non-tight-paragraph block, a tight paragraph suppressing its own leading/trailing
 -- newline, `<li>` vs `<li>\n`, ...) with no room in a well-typed `Node` tree for an
 -- "almost-Node" -- they're represented as explicit `"\n"` leaves spliced into the
--- children lists alongside the real content. `Html.escape "\n" = "\n"` (no escapable
--- characters), and the library's `Coe String (Node cat)` instance is category-polymorphic,
--- so a bare `"\n"` is valid directly between `<li>` elements (`Node .listItem`), not just
--- inside flow/phrasing content.
+-- children lists alongside the real content: a `"\n"` text leaf among flow content, and
+-- `Html.Whitespace.newline` between `<li>` elements, where text isn't allowed.
 mutual
 def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
   | 0, _ => []
@@ -161,8 +159,8 @@ def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
     [Html.blockquote (("\n" : Html.Node .flow) :: renderBlocksNodeF false fuel content), "\n"]
   | fuel + 1, .list kind isTight items =>
     let itemNodes : List (Html.Node .listItem) :=
-      ("\n" : Html.Node .listItem) ::
-        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, "\n"]) []
+      (Html.Whitespace.newline : Html.Node .listItem) ::
+        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, Html.Whitespace.newline]) []
     let listNode : Html.Node .flow := match kind with
       | .bullet _ => Html.ul itemNodes
       | .ordered start _ =>

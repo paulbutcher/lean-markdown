@@ -7,7 +7,7 @@ package markdown where
   version := v!"0.8.1"
   leanOptions := #[⟨`warningAsError, true⟩]
 
-require html from git "https://github.com/paulbutcher/lean-html" @ "v0.11.0"
+require html from git "https://github.com/paulbutcher/lean-html" @ "v0.12.0"
 
 require UnicodeBasic from git
   "https://github.com/fgdorais/lean4-unicode-basic.git" @
