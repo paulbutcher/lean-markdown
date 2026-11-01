@@ -71,7 +71,7 @@ def headingNode (level : Fin 6) (children : List (Html.Node .phrasing)) : Html.N
 
 -- `nodes` interspersed with a newline before each element and a final one at the end, matching
 -- cmark-gfm's own `cr()`-before-each-child rendering convention for tables.
-def interleaveNewlines {cat : Html.Category} [Html.InterElement cat]
+def interleaveNewlines {cat : Html.Category} [HtmlModel.Web.Widens .ws (.html cat)]
     (nodes : List (Html.Node cat)) : List (Html.Node cat) :=
   nodes.foldr (fun n acc => Html.Whitespace.newline :: n :: acc) [Html.Whitespace.newline]
 
@@ -90,16 +90,19 @@ def tableCellNode (isHeader : Bool) (alignment : TableAlignment)
 
 def tableRowNode (isHeader : Bool) (alignments : List TableAlignment)
     (cells : List (List RawInline)) : Html.Node .tableRow :=
-  Html.tr (interleaveNewlines (List.zipWith (tableCellNode isHeader) alignments cells))
+  Html.tr (interleaveNewlines (List.zipWith (fun a c =>
+    (tableCellNode isHeader a c : Html.Node .tableCellOrScript)) alignments cells))
 
 -- `table` takes its head and body as separate arguments, so the newline after `<table>` goes in
 -- the column-group slot, the only whitespace-admitting one ahead of the head.
 def tableNode (header : List (List RawInline)) (alignments : List TableAlignment)
     (rows : List (List (List RawInline))) : Html.Node .flow :=
-  let theadNode := Html.thead (interleaveNewlines [tableRowNode true alignments header])
-  let body : List (Html.Node .tableBody) :=
+  let theadNode :=
+    Html.thead (interleaveNewlines [(tableRowNode true alignments header : Html.Node .tableRowOrScript)])
+  let body : List (Html.Node .tableBodyOrScript) :=
     if rows.isEmpty then [Html.Whitespace.newline]
-    else interleaveNewlines [Html.tbody (interleaveNewlines (rows.map (tableRowNode false alignments)))]
+    else interleaveNewlines [(Html.tbody (interleaveNewlines (rows.map fun r =>
+      (tableRowNode false alignments r : Html.Node .tableRowOrScript))) : Html.Node .tableBodyOrScript)]
   Html.table body (colgroups := [Html.Whitespace.newline]) (thead := some theadNode)
 
 -- Mirrors `CommonMark.Render.Html`'s `renderBlockNodesF`/`renderBlocksNodeF`/`itemNode`
@@ -125,10 +128,10 @@ def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
   | fuel + 1, .blockQuote content =>
     [Html.blockquote (("\n" : Html.Node .flow) :: renderBlocksNodeF false fuel content), "\n"]
   | fuel + 1, .list kind isTight items =>
-    let itemNodes : List (Html.Node .listItem) :=
-      (Html.Whitespace.newline : Html.Node .listItem) ::
+    let itemNodes : List (Html.Node .listItemOrScript) :=
+      (Html.Whitespace.newline : Html.Node .listItemOrScript) ::
         items.foldl (fun acc (checked, content) =>
-          acc ++ [itemNode isTight fuel checked content, Html.Whitespace.newline]) []
+          acc ++ [(itemNode isTight fuel checked content : Html.Node .listItemOrScript), Html.Whitespace.newline]) []
     let listNode : Html.Node .flow := match kind with
       | .bullet _ => Html.ul itemNodes
       | .ordered start _ =>
