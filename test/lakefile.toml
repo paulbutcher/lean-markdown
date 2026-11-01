@@ -19,7 +19,7 @@ rev = "v4.34.0"
 
 [[lean_lib]]
 name = "TestData"
-globs = ["CheckExample", "SpecGuards", "NoEmbeddedHtml", "GfmNoEmbeddedHtml", "AstFuelLaws", "GfmAstFuelLaws",
+globs = ["CheckExample", "HtmlVerbatim", "SpecGuards", "NoEmbeddedHtml", "GfmNoEmbeddedHtml", "AstFuelLaws", "GfmAstFuelLaws",
   "RenderSafeWellFormedness", "GfmRenderSafeWellFormedness", "UriSchemeLaws",
   "SanitizeIdempotence", "GfmSanitizeIdempotence",
   "ZipperLaws", "ParserLaws", "HtmlWellFormedness",

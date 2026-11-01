@@ -158,9 +158,10 @@ def renderBlockNodesF (tight : Bool) : Nat → Block → List (Html.Node .flow)
   | fuel + 1, .blockQuote content =>
     [Html.blockquote (("\n" : Html.Node .flow) :: renderBlocksNodeF false fuel content), "\n"]
   | fuel + 1, .list kind isTight items =>
-    let itemNodes : List (Html.Node .listItem) :=
-      (Html.Whitespace.newline : Html.Node .listItem) ::
-        items.foldl (fun acc content => acc ++ [itemNode isTight fuel content, Html.Whitespace.newline]) []
+    let itemNodes : List (Html.Node .listItemOrScript) :=
+      (Html.Whitespace.newline : Html.Node .listItemOrScript) ::
+        items.foldl (fun acc content =>
+          acc ++ [(itemNode isTight fuel content : Html.Node .listItemOrScript), Html.Whitespace.newline]) []
     let listNode : Html.Node .flow := match kind with
       | .bullet _ => Html.ul itemNodes
       | .ordered start _ =>
