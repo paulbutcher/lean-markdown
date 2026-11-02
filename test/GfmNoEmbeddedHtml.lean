@@ -51,7 +51,7 @@ end
 
 /-- Whether a `Document` contains any embedded raw HTML (`.htmlInline`/`.htmlBlock`),
     the only channel through which `renderHtml` can produce output that isn't
-    `Html.Node.WellFormed`. -/
+    `Html.WellFormedHtml`. -/
 def Document.hasEmbeddedHtml (doc : Document) : Bool :=
   !Block.noEmbeddedHtmlListF (Block.listCount doc + 1) doc
 

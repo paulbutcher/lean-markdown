@@ -18,9 +18,9 @@ Main entry points: `CommonMark.parseDocument : String → Document` and
 (`CommonMark.Zipper`) provide cursor-style navigation and editing over it.
 
 `parseDocument` is total and matches the official example suite exactly (see the
-`#guard` checks in `test/SpecGuards.lean`); `renderHtml` builds its output
-through the `Html` library's typed constructors (github.com/paulbutcher/lean-html) rather
-than hand-rolled string concatenation, so every AST leaf's string content is escaped by
-construction: it reaches the output only through `Html.Node.text`/`Html.Node.textElement`
-(`Html.escape_safe`, `Html.Node.render_text_safe`, `Html.Node.render_textElement_safe`) or
-`Html.Attrs.render` (`Html.Attrs.render_safe`), all public facts of that library. -/
+`#guard` checks in `test/SpecGuards.lean`). `renderHtml` renders the tree `htmlNodes` builds
+(`CommonMark.Render.Nodes`), a lean-html-model tree generic over the element payload, so that a
+consumer such as a virtual DOM can take the tree instead of the string; `htmlNodesSafe` gives one
+with no raw HTML. Rendering is lean-html-renderer's, so every AST leaf's string content is
+escaped by construction: it reaches the output only through `Html.escape` (`Html.escape_safe`)
+or `Html.Attrs.render` (`Html.Attrs.render_safe`), both public facts of that library. -/

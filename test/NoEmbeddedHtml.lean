@@ -7,7 +7,7 @@ public import CommonMark
 @[expose] public section
 
 -- `.htmlInline`/`.htmlBlock` are the only leaves `renderHtml` passes through unescaped
--- (`Html.Node.unsafeRaw`), so their absence is both the hypothesis under which
+-- (as verbatim leaves), so their absence is both the hypothesis under which
 -- `HtmlWellFormedness.lean` proves the output well-formed and the property
 -- `SanitizeSafety.lean` proves `Document.sanitize` establishes. Sharing one definition is what
 -- lets `RenderSafeWellFormedness.lean` compose those two directly.
@@ -50,7 +50,7 @@ end
 
 /-- Whether a `Document` contains any embedded raw HTML (`.htmlInline`/`.htmlBlock`),
     the only channel through which `renderHtml` can produce output that isn't
-    `Html.Node.WellFormed`. -/
+    `Html.WellFormedHtml`. -/
 def Document.hasEmbeddedHtml (doc : Document) : Bool :=
   !Block.noEmbeddedHtmlListF (Block.listCount doc + 1) doc
 

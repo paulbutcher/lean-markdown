@@ -8,10 +8,9 @@ public import HtmlVerbatim
 @[expose] public section
 
 -- Mirrors `HtmlWellFormedness.lean`'s structure exactly, adapted to `GFMarkdown`'s own
--- (structurally similar but independent) `Block`/`RawInline`/renderer: `renderHtml` builds
--- its entire output through `Html.Node`'s typed constructors except for
--- `.htmlInline`/`.htmlBlock`, the only verbatim markup a node can hold and so the one
--- thing `Html.Node.render_wellFormed` rules out. A `Document` containing neither renders to
+-- (structurally similar but independent) `Block`/`RawInline`/renderer: the only verbatim
+-- leaves in the tree `renderHtml` renders, the one thing `Html.Node.render_wellFormed` rules out,
+-- are those built for `.htmlInline`/`.htmlBlock`. A `Document` containing neither renders to
 -- well-formed HTML.
 -- `GfmRenderSafeWellFormedness.lean` retires that hypothesis for `renderHtmlSafe`.
 
@@ -19,10 +18,11 @@ namespace GFMarkdown
 
 open CommonMark.Parser (RawInline)
 
-open Html
+open Html HtmlModel CommonMark
 
 attribute [local simp] HtmlModel.Node.hasVerbatim HtmlModel.Node.erase HtmlModel.Segs.erase
-  HtmlModel.Seg.erase HtmlModel.Tree.hasVerbatim HtmlModel.Tree.anyVerbatim Whitespace.newline
+  HtmlModel.Seg.erase HtmlModel.Tree.hasVerbatim HtmlModel.Tree.anyVerbatim HtmlNode.text
+  HtmlNode.newline HtmlNode.elem HtmlNode.void
 
 /-- Rendering a list of nodes free of verbatim markup into a string leaves the string well-formed. This is
     the step from a claim about nodes to a claim about `renderHtml`'s actual output.
@@ -35,14 +35,14 @@ private theorem foldl_render_wellFormed {cat : Category} (dialect : Dialect)
     (l : List (Node cat)) (h : ∀ n ∈ l, n.hasVerbatim = false) :
     ∀ acc, WellFormedHtml dialect acc →
       WellFormedHtml dialect
-        (l.foldl (fun acc n => acc ++ n.render dialect) acc) := by
+        (l.foldl (fun acc n => acc ++ Node.render n dialect) acc) := by
   induction l with
   | nil => intro acc hacc; simpa using hacc
   | cons n rest ih =>
     intro acc hacc
     simp only [List.foldl_cons]
     exact ih (fun n' hn' => h n' (List.mem_cons_of_mem _ hn'))
-      (acc ++ n.render dialect)
+      (acc ++ Node.render n dialect)
       (hacc.append (Node.render_wellFormed n (h n (List.mem_cons_self ..)) dialect))
 
 /-- Anything found in a list built by conditionally inserting `x` between `A` and `B` came from
@@ -91,8 +91,8 @@ private theorem foldl_append_mem {α β : Type} (f : α → List β) :
     The disjunction is all a well-formedness argument needs, since it never matters where in
     the list a node ended up, only where it came from; positions would have to be tracked to
     say more, and nothing here would use it. -/
-private theorem interleaveNewlines_mem {cat : Category} [HtmlModel.Web.Widens .ws (.html cat)] :
-    (l : List (Node cat)) → ∀ c ∈ interleaveNewlines l, c = (Whitespace.newline : Node cat) ∨ c ∈ l
+private theorem interleaveNewlines_mem {P : Type} {cat : Category} [HtmlModel.Web.Widens .ws (.html cat)] :
+    (l : List (HtmlNode P cat)) → ∀ c ∈ interleaveNewlines l, c = (HtmlNode.newline : HtmlNode P cat) ∨ c ∈ l
   | [], c, hc => Or.inl (List.mem_singleton.mp hc)
   | n :: rest, c, hc => by
     simp only [interleaveNewlines, List.foldr_cons, List.mem_cons] at hc
@@ -110,42 +110,41 @@ private theorem interleaveNewlines_mem {cat : Category} [HtmlModel.Web.Widens .w
     is what the table constructors below take as children; the added nodes are whitespace,
     which holds no verbatim markup, so the hypothesis need only cover the nodes that were
     already there. -/
-private theorem interleaveNewlines_wellFormed {cat : Category} [HtmlModel.Web.Widens .ws (.html cat)]
-    (nodes : List (Node cat)) (h : ∀ n ∈ nodes, n.hasVerbatim = false) :
+private theorem interleaveNewlines_wellFormed {P : Type} {cat : Category} [HtmlModel.Web.Widens .ws (.html cat)]
+    (nodes : List (HtmlNode P cat)) (h : ∀ n ∈ nodes, n.hasVerbatim = false) :
     ∀ c ∈ interleaveNewlines nodes, c.hasVerbatim = false := by
   intro c hc
   rcases interleaveNewlines_mem nodes c hc with hc' | hc'
   · subst hc'; simp
   · exact h c hc'
 
+variable {P : Type} [HtmlModel.HtmlPayload P]
+
 /-- A heading element is free of verbatim markup whenever its children are.
 
     Quantifying over `level : Fin 6` covers all six tags in one claim, `headingNode` choosing
     the tag by level and building every branch the same way, as phrasing children inside a flow
     element; nothing but the children can decide the question, hence the single hypothesis. -/
-private theorem headingNode_wellFormed (level : Fin 6) (children : List (Node .phrasing))
-    (h : ∀ c ∈ children, c.hasVerbatim = false) : (headingNode level children).hasVerbatim = false := by
-  unfold headingNode
-  split <;> simpa [Html.h1, Html.h2, Html.h3, Html.h4, Html.h5, Html.h6] using h
+private theorem headingNode_wellFormed (level : Fin 6) (children : List (HtmlNode P .phrasing))
+    (h : ∀ c ∈ children, c.hasVerbatim = false) :
+    (CommonMark.headingNode level children).hasVerbatim = false := by
+  unfold CommonMark.headingNode
+  split <;> simpa using h
 
 /-- The list element the renderer builds is free of verbatim markup whenever its items are,
     whichever kind of list it is and whether or not it carries a `start`.
 
-    The proposition inlines the very `match` the renderer performs rather than naming a helper,
-    so it applies to the renderer's own expression; its three branches, `<ul>`, plain `<ol>`,
-    and `<ol start="n">`, are covered together, including the one whose attribute value is
-    computed from the list's starting number. Attributes carry no hypothesis, being typed
-    records rather than markup. -/
+    `CommonMark.listNode` builds `<ul>`, plain `<ol>`, or `<ol start="n">` by `kind`, so
+    quantifying over `kind` covers all three, including the one whose attribute value is
+    computed from the list's starting number. Attributes carry no hypothesis, being the
+    element's payload rather than children, which is all `hasVerbatim` inspects. -/
 private theorem listNode_wellFormed (kind : CommonMark.ListType)
-    (children : List (Node .listItemOrScript)) (h : ∀ c ∈ children, c.hasVerbatim = false) :
-    (match kind with
-      | .bullet _ => Html.ul children
-      | .ordered start _ =>
-        if start == 1 then Html.ol children else Html.ol children { start := toString start }
-      : Node .flow).hasVerbatim = false := by
+    (children : List (HtmlNode P .listItemOrScript)) (h : ∀ c ∈ children, c.hasVerbatim = false) :
+    (CommonMark.listNode kind children).hasVerbatim = false := by
   cases kind with
-  | bullet _ => simpa [Html.ul] using h
-  | ordered start _ => dsimp only; split <;> simpa [Html.ol] using h
+  | bullet _ => simpa [CommonMark.listNode] using h
+  | ordered _ _ => simpa [CommonMark.listNode] using h
+
 
 /-- The nodes a task-list checkbox renders to are free of verbatim markup, checked or unchecked.
 
@@ -154,10 +153,10 @@ private theorem listNode_wellFormed (kind : CommonMark.ListType)
     gets no checkbox. What is produced is a void `<input>` and a literal space; attributes are
     not markup, so the raw attribute run the renderer builds cannot break the claim. -/
 private theorem checkboxNodes_wellFormed (checked : Option Bool) :
-    ∀ c ∈ checkboxNodes checked, c.hasVerbatim = false := by
+    ∀ c ∈ checkboxNodes (P := P) checked, c.hasVerbatim = false := by
   cases checked with
   | none => simp [checkboxNodes]
-  | some isChecked => simp [checkboxNodes, Html.input]
+  | some isChecked => simp [checkboxNodes]
 
 -- Mirrors `CommonMark.inlineNodes_wellFormed`/`inlineListNodes_wellFormed`'s own mutual
 -- structural recursion case-for-case, extended with the `.strikethrough`/`<del>` case.
@@ -171,26 +170,26 @@ mutual
     among them, and does real work in exactly one place, `.htmlInline`, where it is
     contradictory and the case closes. -/
 theorem inlineNodes_wellFormed :
-    (i : RawInline) → RawInline.noEmbeddedHtml i = true → ∀ n ∈ inlineNodes i, n.hasVerbatim = false
+    (i : RawInline) → RawInline.noEmbeddedHtml i = true → ∀ n ∈ inlineNodes (P := P) i, n.hasVerbatim = false
   | .text s, _ => by simp [inlineNodes]
-  | .code s, _ => by simp [inlineNodes, Html.code]
+  | .code s, _ => by simp [inlineNodes]
   | .emph content, h => by
     simp only [RawInline.noEmbeddedHtml] at h
-    simpa [inlineNodes, Html.em] using inlineListNodes_wellFormed content h
+    simpa [inlineNodes] using inlineListNodes_wellFormed content h
   | .strong content, h => by
     simp only [RawInline.noEmbeddedHtml] at h
-    simpa [inlineNodes, Html.strong] using inlineListNodes_wellFormed content h
+    simpa [inlineNodes] using inlineListNodes_wellFormed content h
   | .link _ _ content, h => by
     simp only [RawInline.noEmbeddedHtml] at h
-    simpa [inlineNodes, Html.a] using inlineListNodes_wellFormed content h
-  | .image .., _ => by simp [inlineNodes, Html.img]
+    simpa [inlineNodes] using inlineListNodes_wellFormed content h
+  | .image .., _ => by simp [inlineNodes]
   | .htmlInline _, h => by simp [RawInline.noEmbeddedHtml] at h
   | .softBreak, _ => by simp [inlineNodes]
-  | .lineBreak, _ => by simp [inlineNodes, Html.br]
+  | .lineBreak, _ => by simp [inlineNodes]
   | .strikethrough content, h => by
     simp only [RawInline.noEmbeddedHtml] at h
-    simpa [inlineNodes, Html.del] using inlineListNodes_wellFormed content h
-  | .math .., _ => by simp [inlineNodes, Html.span]; split <;> simp
+    simpa [inlineNodes] using inlineListNodes_wellFormed content h
+  | .math .., _ => by simp [inlineNodes]
 
 /-- Rendering a list of inline nodes that carry no raw HTML yields only nodes free of verbatim
     markup.
@@ -200,7 +199,7 @@ theorem inlineNodes_wellFormed :
     does. This is the form the block and table cases need, all of which hold their content as
     a `List RawInline`. -/
 theorem inlineListNodes_wellFormed :
-    (l : List RawInline) → RawInline.noEmbeddedHtmlList l = true → ∀ n ∈ inlineListNodes l, n.hasVerbatim = false
+    (l : List RawInline) → RawInline.noEmbeddedHtmlList l = true → ∀ n ∈ inlineListNodes (P := P) l, n.hasVerbatim = false
   | [], _ => by intro n hn; simp [inlineListNodes] at hn
   | i :: rest, h => by
     simp only [RawInline.noEmbeddedHtmlList, Bool.and_eq_true] at h
@@ -219,10 +218,10 @@ end
     being lifted into flow content within the cell. -/
 private theorem tableCellNode_wellFormed (isHeader : Bool) (alignment : CommonMark.Parser.TableAlignment)
     (content : List RawInline) (h : RawInline.noEmbeddedHtmlList content = true) :
-    (tableCellNode isHeader alignment content).hasVerbatim = false := by
-  have hc := inlineListNodes_wellFormed content h
+    (tableCellNode (P := P) isHeader alignment content).hasVerbatim = false := by
+  have hc := inlineListNodes_wellFormed (P := P) content h
   unfold tableCellNode
-  split <;> simpa [Html.th, Html.td, Function.comp_def] using hc
+  split <;> simpa [Function.comp_def] using hc
 
 /-- Anything found in a `zipWith` is the function applied to some element of each list.
 
@@ -247,13 +246,13 @@ private theorem mem_zipWith {α β γ : Type} (f : α → β → γ) :
     length without weakening the claim, and the newlines interleaved between cells are text. -/
 private theorem tableRowNode_wellFormed (isHeader : Bool) (alignments : List CommonMark.Parser.TableAlignment)
     (cells : List (List RawInline)) (h : ∀ content ∈ cells, RawInline.noEmbeddedHtmlList content = true) :
-    (tableRowNode isHeader alignments cells).hasVerbatim = false := by
-  have hcells : ∀ c ∈ List.zipWith (fun a c => (tableCellNode isHeader a c : Node .tableCellOrScript))
+    (tableRowNode (P := P) isHeader alignments cells).hasVerbatim = false := by
+  have hcells : ∀ c ∈ List.zipWith (fun a c => (Web.widen (tableCellNode isHeader a c) : HtmlNode P .tableCellOrScript))
       alignments cells, c.hasVerbatim = false := by
     intro c hc
     obtain ⟨content, hcontent, alignment, rfl⟩ := mem_zipWith _ alignments cells c hc
     simpa using tableCellNode_wellFormed isHeader alignment content (h content hcontent)
-  simpa [tableRowNode, Html.tr] using interleaveNewlines_wellFormed _ hcells
+  simpa [tableRowNode] using interleaveNewlines_wellFormed _ hcells
 
 /-- A table whose header and body cells contain no raw HTML renders to a node free of verbatim
     markup.
@@ -267,23 +266,23 @@ private theorem tableNode_wellFormed (header : List (List RawInline))
     (alignments : List CommonMark.Parser.TableAlignment) (rows : List (List (List RawInline)))
     (hheader : ∀ content ∈ header, RawInline.noEmbeddedHtmlList content = true)
     (hrows : ∀ row ∈ rows, ∀ content ∈ row, RawInline.noEmbeddedHtmlList content = true) :
-    (tableNode header alignments rows).hasVerbatim = false := by
+    (tableNode (P := P) header alignments rows).hasVerbatim = false := by
   have hthead : ∀ c ∈ interleaveNewlines
-      [(tableRowNode true alignments header : Node .tableRowOrScript)], c.hasVerbatim = false :=
+      [(Web.widen (tableRowNode true alignments header) : HtmlNode P .tableRowOrScript)], c.hasVerbatim = false :=
     interleaveNewlines_wellFormed _ (by simpa using tableRowNode_wellFormed true alignments header hheader)
   have hbodyRows : ∀ c ∈ interleaveNewlines (rows.map fun r =>
-      (tableRowNode false alignments r : Node .tableRowOrScript)), c.hasVerbatim = false := by
+      (Web.widen (tableRowNode false alignments r) : HtmlNode P .tableRowOrScript)), c.hasVerbatim = false := by
     apply interleaveNewlines_wellFormed
     intro c hc
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hc
     simpa using tableRowNode_wellFormed false alignments row (hrows row hrow)
-  have hbody : ∀ c ∈ interleaveNewlines [(Html.tbody (interleaveNewlines (rows.map fun r =>
-      (tableRowNode false alignments r : Node .tableRowOrScript))) : Node .tableBodyOrScript)],
+  have hbody : ∀ c ∈ interleaveNewlines [(Web.widen (HtmlNode.elem .tbody .tableBody .tableRowOrScript (HtmlNode.payload []) (interleaveNewlines (rows.map fun r =>
+      (Web.widen (tableRowNode false alignments r) : HtmlNode P .tableRowOrScript)))) : HtmlNode P .tableBodyOrScript)],
       c.hasVerbatim = false :=
-    interleaveNewlines_wellFormed _ (by simpa [Html.tbody] using hbodyRows)
+    interleaveNewlines_wellFormed _ (by simpa using hbodyRows)
   simp only [HtmlModel.Node.hasVerbatim] at hthead hbody
   unfold tableNode
-  split <;> simp_all [Html.table, Html.thead, HtmlModel.Seg.ofOption]
+  split <;> simp_all
 
 -- Mirrors `CommonMark.renderBlockNodesF_wellFormed`/`renderBlocksNodeF_wellFormed`'s own
 -- mutual, fuel-bounded recursion case-for-case, extended with `.table` (via
@@ -300,46 +299,46 @@ mutual
     the table and checkbox claims above. -/
 theorem renderBlockNodesF_wellFormed :
     (tight : Bool) → (fuel : Nat) → (b : Block) → Block.noEmbeddedHtmlF fuel b = true →
-      ∀ n ∈ renderBlockNodesF tight fuel b, n.hasVerbatim = false
+      ∀ n ∈ renderBlockNodesF (P := P) tight fuel b, n.hasVerbatim = false
   | _, 0, _, _ => by intro n hn; simp [renderBlockNodesF] at hn
   | tight, _ + 1, .paragraph content, h => by
     simp only [Block.noEmbeddedHtmlF] at h
-    have hc := inlineListNodes_wellFormed content h
+    have hc := inlineListNodes_wellFormed (P := P) content h
     simp only [renderBlockNodesF]
-    split <;> simpa [Html.p] using hc
+    split <;> simpa using hc
   | _, _ + 1, .heading level content, h => by
     simp only [Block.noEmbeddedHtmlF] at h
-    have hc := headingNode_wellFormed level _ (inlineListNodes_wellFormed content h)
+    have hc := headingNode_wellFormed level _ (inlineListNodes_wellFormed (P := P) content h)
     simp only [HtmlModel.Node.hasVerbatim] at hc
     simp [renderBlockNodesF, hc]
-  | _, _ + 1, .codeBlock _ _, _ => by unfold renderBlockNodesF; simp [Html.pre, Html.code]
-  | _, _ + 1, .thematicBreak, _ => by simp [renderBlockNodesF, Html.hr]
+  | _, _ + 1, .codeBlock _ _, _ => by unfold renderBlockNodesF; simp
+  | _, _ + 1, .thematicBreak, _ => by simp [renderBlockNodesF]
   | _, _ + 1, .htmlBlock _, h => by simp [Block.noEmbeddedHtmlF] at h
   | _, fuel + 1, .blockQuote content, h => by
     simp only [Block.noEmbeddedHtmlF] at h
-    simpa [renderBlockNodesF, Html.blockquote] using renderBlocksNodeF_wellFormed false fuel content h
+    simpa [renderBlockNodesF] using renderBlocksNodeF_wellFormed false fuel content h
   | _, fuel + 1, .list kind isTight items, h => by
     simp only [Block.noEmbeddedHtmlF] at h
     have hitems : ∀ p ∈ items, Block.noEmbeddedHtmlListF fuel p.2 = true := List.all_eq_true.mp h
-    have hitemNode : ∀ p ∈ items, (itemNode isTight fuel p.1 p.2).hasVerbatim = false := by
+    have hitemNode : ∀ p ∈ items, (itemNode (P := P) isTight fuel p.1 p.2).hasVerbatim = false := by
       intro (checked, content) hp
-      have hcheckbox := checkboxNodes_wellFormed checked
-      have hprefix : ∀ c ∈ itemPrefix isTight content, c.hasVerbatim = false := by
+      have hcheckbox := checkboxNodes_wellFormed (P := P) checked
+      have hprefix : ∀ c ∈ itemPrefix (P := P) isTight content, c.hasVerbatim = false := by
         unfold itemPrefix; split <;> simp
       have hblocks := renderBlocksNodeF_wellFormed isTight fuel content (hitems (checked, content) hp)
       simp only [HtmlModel.Node.hasVerbatim] at hcheckbox hprefix hblocks
-      simp only [itemNode, Html.li]
+      simp only [itemNode]
       simpa using ⟨hcheckbox, hprefix, hblocks⟩
-    have hitemNodes : ∀ c ∈ ((Whitespace.newline : Node .listItemOrScript) ::
+    have hitemNodes : ∀ c ∈ ((HtmlNode.newline : HtmlNode P .listItemOrScript) ::
         items.foldl (fun acc (checked, content) =>
-          acc ++ [(itemNode isTight fuel checked content : Node .listItemOrScript), Whitespace.newline]) []),
+          acc ++ [(Web.widen (itemNode isTight fuel checked content) : HtmlNode P .listItemOrScript), HtmlNode.newline]) []),
         c.hasVerbatim = false := by
       intro c hc
       simp only [List.mem_cons] at hc
       rcases hc with hc | hc
       · subst hc; simp
       · rcases foldl_append_mem (fun (p : Option Bool × List Block) =>
-            [(itemNode isTight fuel p.1 p.2 : Node .listItemOrScript), Whitespace.newline]) items [] c hc
+            [(Web.widen (itemNode isTight fuel p.1 p.2) : HtmlNode P .listItemOrScript), HtmlNode.newline]) items [] c hc
           with hc' | ⟨p, hp, hc'⟩
         · simp at hc'
         · simp only [List.mem_cons, List.not_mem_nil, or_false] at hc'
@@ -359,7 +358,7 @@ theorem renderBlockNodesF_wellFormed :
     have hrows : ∀ row ∈ rows, ∀ content ∈ row, RawInline.noEmbeddedHtmlList content = true := by
       intro row hrow
       exact List.all_eq_true.mp (List.all_eq_true.mp h.2 row hrow)
-    have ht := tableNode_wellFormed header alignments rows hheader hrows
+    have ht := tableNode_wellFormed (P := P) header alignments rows hheader hrows
     simp only [HtmlModel.Node.hasVerbatim] at ht
     simp [renderBlockNodesF, ht]
 
@@ -371,7 +370,7 @@ theorem renderBlockNodesF_wellFormed :
     between blocks are text, which is where `mem_ite_append` above is spent. -/
 theorem renderBlocksNodeF_wellFormed :
     (tight : Bool) → (fuel : Nat) → (bs : List Block) → Block.noEmbeddedHtmlListF fuel bs = true →
-      ∀ n ∈ renderBlocksNodeF tight fuel bs, n.hasVerbatim = false
+      ∀ n ∈ renderBlocksNodeF (P := P) tight fuel bs, n.hasVerbatim = false
   | _, 0, _, _ => by intro n hn; simp [renderBlocksNodeF] at hn
   | _, _ + 1, [], _ => by intro n hn; simp [renderBlocksNodeF] at hn
   | tight, fuel + 1, b :: rest, h => by
@@ -401,7 +400,7 @@ theorem renderHtml_wellFormed (doc : Document) (h : doc.hasEmbeddedHtml = false)
     Html.WellFormedHtml .xhtml (renderHtml doc) := by
   have h' : Block.noEmbeddedHtmlListF (Block.listCount doc + 1) doc = true := by
     simpa [Document.hasEmbeddedHtml] using h
-  unfold renderHtml renderBlocks
+  unfold renderHtml CommonMark.renderNodes htmlNodes blocksNodes
   exact foldl_render_wellFormed .xhtml _ (renderBlocksNodeF_wellFormed false _ doc h')
     "" (WellFormedHtml.text (by simp))
 

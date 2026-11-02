@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+* lean-html is replaced by lean-html-model v0.4.1 and lean-html-renderer v0.1.0
+* `htmlNodes` and `htmlNodesSafe` give the tree `renderHtml` and `renderHtmlSafe` render, generic over the element payload
+* `htmlNodesSafe` is proved to hold no verbatim markup
+* Breaking: the node-level builders (`inlineNodes`, `itemNode`, ...) return `HtmlNode P cat` rather than `Html.Node cat`
+
 ## [0.8.3] - 2026-11-01
 
 * lean-html v0.13.0

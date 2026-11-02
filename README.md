@@ -76,6 +76,8 @@ open CommonMark
 -- <p><a href="">x</a></p>
 ```
 
+To build a tree rather than a string, for a virtual DOM for instance, `htmlNodes` and `htmlNodesSafe` give the [lean-html-model](https://github.com/paulbutcher/lean-html-model) tree that `renderHtml` and `renderHtmlSafe` render, generic over the element payload through `HtmlModel.HtmlPayload`. `htmlNodesSafe`'s tree is proved to hold no verbatim markup.
+
 `Document.map`/`Document.fold` (`CommonMark.Ast`) cover whole-tree rewrites and traversals. For localized, cursor-style edits, use the zipper (`BlockZipper`/`InlineZipper` in `CommonMark.Zipper`) instead of walking `Document`/`Block`/`Inline` by hand:
 
 ```lean

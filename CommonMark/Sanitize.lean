@@ -88,4 +88,11 @@ def Document.sanitize (doc : Document) : Document := Document.map sanitizeInline
     guarantee no raw HTML survives and every emitted `href`/`src` has an allowlisted scheme. -/
 def renderHtmlSafe (doc : Document) : String := renderHtml (Document.sanitize doc)
 
+/-- `htmlNodes`, preceded by `Document.sanitize`: the tree `renderHtmlSafe` renders, which holds
+    no verbatim markup, so a consumer with no way to insert raw HTML, such as a virtual DOM,
+    can take every node it contains. -/
+def htmlNodesSafe {P : Type} [HtmlModel.HtmlPayload P] (doc : Document) :
+    List (HtmlNode P .flow) :=
+  htmlNodes (Document.sanitize doc)
+
 end CommonMark

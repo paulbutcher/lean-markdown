@@ -193,7 +193,7 @@ theorem sanitizeBlockListF_ok : (fuel : Nat) → (bs : List Block) →
 end
 
 /-- `Document.sanitize doc` embeds no raw HTML (`.htmlInline`/`.htmlBlock`): every leaf that
-    would otherwise reach `renderHtml`'s output through `Html.Node.unsafeRaw` has been removed.
+    would otherwise reach `renderHtml`'s output as a verbatim leaf has been removed.
 
     The proposition says that because those two constructors are the only ones
     `Block.noEmbeddedHtmlListF` answers `false` on, the second through the inline predicate it

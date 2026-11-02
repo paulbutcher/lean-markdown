@@ -76,4 +76,10 @@ def Document.sanitize (doc : Document) : Document :=
     unlike `renderHtml` on its own. See `CommonMark.Sanitize`'s module docs. -/
 def renderHtmlSafe (doc : Document) : String := renderHtml (Document.sanitize doc)
 
+/-- `htmlNodes`, preceded by `Document.sanitize`: the tree `renderHtmlSafe` renders, which holds
+    no verbatim markup. See `CommonMark.htmlNodesSafe`. -/
+def htmlNodesSafe {P : Type} [HtmlModel.HtmlPayload P] (doc : Document) :
+    List (CommonMark.HtmlNode P .flow) :=
+  htmlNodes (Document.sanitize doc)
+
 end GFMarkdown

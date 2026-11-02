@@ -40,4 +40,21 @@ theorem renderHtmlSafe_wellFormed (doc : Document) :
     Html.WellFormedHtml .xhtml (renderHtmlSafe doc) :=
   renderHtml_wellFormed (Document.sanitize doc) (Document.sanitize_hasEmbeddedHtml doc)
 
+/-- The tree `htmlNodesSafe` builds holds no verbatim markup, whatever the document and whatever
+    the payload. A consumer that cannot insert raw HTML, such as a virtual DOM, can rely on this
+    instead of handling verbatim leaves.
+
+    `Node.hasVerbatim` answers `true` when a node holds verbatim markup at any depth, and the
+    claim quantifies over every top-level node, so nothing nested escapes it. `P` is arbitrary
+    because the payload only carries attributes, which `hasVerbatim` does not inspect. As with
+    `renderHtmlSafe_wellFormed`, `doc` carries no hypothesis: `Document.sanitize_hasEmbeddedHtml`
+    supplies the one `renderBlocksNodeF_wellFormed` needs. -/
+theorem htmlNodesSafe_noVerbatim {P : Type} [HtmlModel.HtmlPayload P] (doc : Document) :
+    ∀ n ∈ htmlNodesSafe (P := P) doc, n.hasVerbatim = false := by
+  have h : Block.noEmbeddedHtmlListF (Block.listCount (Document.sanitize doc) + 1)
+      (Document.sanitize doc) = true := by
+    simpa [Document.hasEmbeddedHtml] using Document.sanitize_hasEmbeddedHtml doc
+  unfold htmlNodesSafe htmlNodes blocksNodes
+  exact renderBlocksNodeF_wellFormed false _ _ h
+
 end GFMarkdown

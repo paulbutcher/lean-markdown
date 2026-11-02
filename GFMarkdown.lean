@@ -10,5 +10,6 @@ public import GFMarkdown.Sanitize
 /-! A GitHub Flavored Markdown (GFM) parser and renderer, built on top of `CommonMark`.
 
 Main entry points: `GFMarkdown.parseDocument : String → Document` and
-`GFMarkdown.renderHtml : Document → String`. `GFMarkdown.Block`/`GFMarkdown.Document`
-(`GFMarkdown.Ast`) are the GFM-aware AST, adding `table` alongside CommonMark's block kinds. -/
+`GFMarkdown.renderHtml : Document → String`, or `GFMarkdown.htmlNodes` for the tree it renders.
+`GFMarkdown.Block`/`GFMarkdown.Document` (`GFMarkdown.Ast`) are the GFM-aware AST, adding
+`table` alongside CommonMark's block kinds. -/
