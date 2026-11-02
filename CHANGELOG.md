@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.0] - 2026-11-02
 
 * lean-html is replaced by lean-html-model v0.4.1 and lean-html-renderer v0.1.0
 * `htmlNodes` and `htmlNodesSafe` give the tree `renderHtml` and `renderHtmlSafe` render, generic over the element payload
