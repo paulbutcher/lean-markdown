@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.1] - 2026-11-06
+
+* lean-html-renderer v0.1.1
+
 ## [0.9.0] - 2026-11-02
 
 * lean-html is replaced by lean-html-model v0.4.1 and lean-html-renderer v0.1.0

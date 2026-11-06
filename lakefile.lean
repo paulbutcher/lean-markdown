@@ -4,11 +4,11 @@ import Lake
 open Lake DSL
 
 package markdown where
-  version := v!"0.9.0"
+  version := v!"0.9.1"
   leanOptions := #[⟨`warningAsError, true⟩]
 
 require «html-model» from git "https://github.com/paulbutcher/lean-html-model" @ "v0.4.1"
-require «html-renderer» from git "https://github.com/paulbutcher/lean-html-renderer" @ "v0.1.0"
+require «html-renderer» from git "https://github.com/paulbutcher/lean-html-renderer" @ "v0.1.1"
 
 require UnicodeBasic from git
   "https://github.com/fgdorais/lean4-unicode-basic.git" @
