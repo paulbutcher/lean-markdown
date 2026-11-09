@@ -14,6 +14,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # With an owner and no repositories, the token reaches every repository the App is installed on.
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.LEAN_BOT_APP_ID }}
+          private-key: ${{ secrets.LEAN_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
       - uses: paulbutcher/lean-bump/notify@v1
         with:
-          token: ${{ secrets.LEAN_BUMP_TOKEN }}
+          token: ${{ steps.app.outputs.token }}
