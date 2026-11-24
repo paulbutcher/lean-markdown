@@ -4,7 +4,7 @@ import Lake
 open Lake DSL
 
 package markdown where
-  version := v!"0.10.0"
+  version := v!"0.10.1"
   leanOptions := #[⟨`warningAsError, true⟩]
 
 require «html-model» from git "https://github.com/paulbutcher/lean-html-model" @ "v0.5.1"

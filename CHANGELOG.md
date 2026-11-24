@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.1] - 2026-11-24
+
+* lean-html-model v0.5.1
+* lean-html-renderer v0.2.1
+
 ## [0.10.0] - 2026-11-24
 
 * Breaking: Lean v4.36.0
